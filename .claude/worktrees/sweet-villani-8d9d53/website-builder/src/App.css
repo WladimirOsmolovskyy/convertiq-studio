@@ -1,0 +1,43 @@
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background-color: var(--app-bg);
+}
+
+.sidebar {
+  width: 320px;
+  background-color: var(--app-surface);
+  border-right: 1px solid var(--app-border);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+}
+
+.preview-area {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  overflow: auto;
+  position: relative;
+  background-image: radial-gradient(var(--app-surface-hover) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.template-wrapper {
+  width: 100%;
+  max-width: 1200px;
+  height: 100%;
+  border-radius: var(--app-radius);
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--tpl-color-background);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}

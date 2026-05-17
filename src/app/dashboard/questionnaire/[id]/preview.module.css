@@ -1,0 +1,299 @@
+/* ─── Preview Page (embedded in editor) ──────────────────────────── */
+.previewPage {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 2rem 2rem;
+  transition: background 0.3s;
+  position: relative;
+}
+
+.previewContainer {
+  width: 100%;
+  transition: max-width 0.3s;
+}
+
+/* ─── Preview Banner ─────────────────────────────────────────────── */
+.previewBanner {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  width: 100%;
+  margin-bottom: 1.5rem;
+  padding-top: 1rem;
+}
+
+.previewBannerInner {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.375rem 0.875rem;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  max-width: 560px;
+  margin: 0 auto;
+  box-shadow: var(--shadow-md);
+}
+
+.previewBadge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: var(--accent-muted);
+  padding: 0.125rem 0.4375rem;
+  border-radius: 5px;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.previewBannerText {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.previewRestartBtn {
+  background: transparent;
+  border: 1px solid var(--border-hover);
+  color: var(--accent);
+  padding: 0.1875rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.previewRestartBtn:hover {
+  background: var(--accent-muted);
+  border-color: rgba(0, 122, 255, 0.3);
+}
+
+.previewRestartBtnLarge {
+  margin-top: 1.5rem;
+  background: var(--accent-muted);
+  border: 1px solid rgba(0, 122, 255, 0.15);
+  color: var(--accent);
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.previewRestartBtnLarge:hover {
+  background: rgba(0, 122, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+/* ─── Progress ─────────────────────────────────────────────────── */
+.progressWrap {
+  margin-bottom: 1.5rem;
+}
+
+.progressLabel {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.progressBar {
+  border-radius: 9999px;
+  overflow: hidden;
+  transition: height 0.3s;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* ─── Question Card ────────────────────────────────────────────── */
+.questionWrap {
+  animation: previewFadeIn 0.35s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+@keyframes previewFadeIn {
+  from { opacity: 0; transform: scale(0.98) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.questionTitle {
+  margin-bottom: 0.375rem;
+}
+
+.questionDescription {
+  margin-bottom: 1.25rem;
+}
+
+.requiredStar {
+  color: var(--error);
+  margin-left: 0.25rem;
+}
+
+/* ─── Options ──────────────────────────────────────────────────── */
+.optionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.optionButton {
+  padding: 0.75rem 1rem;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: inherit;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.optionButton:hover {
+  transform: translateY(-1px);
+}
+
+.optionIndicator {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.3;
+  transition: all 0.15s;
+}
+.optionButton.selected .optionIndicator {
+  opacity: 1;
+  background: currentColor;
+}
+.optionIndicator.checkbox {
+  border-radius: 4px;
+}
+
+/* ─── Input Fields ─────────────────────────────────────────────── */
+.previewInput {
+  width: 100%;
+  padding: 0.75rem 0.875rem;
+  border: none;
+  font-size: inherit;
+  font-family: inherit;
+  transition: border 0.15s, box-shadow 0.15s;
+}
+.previewInput:focus {
+  outline: none;
+}
+
+.previewTextarea {
+  width: 100%;
+  padding: 0.75rem 0.875rem;
+  border: none;
+  font-size: inherit;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 110px;
+  transition: border 0.15s, box-shadow 0.15s;
+}
+.previewTextarea:focus {
+  outline: none;
+}
+
+/* ─── Rating ───────────────────────────────────────────────────── */
+.ratingStars {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.ratingStar {
+  font-size: 1.75rem;
+  cursor: pointer;
+  transition: transform 0.15s;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.ratingStar:hover {
+  transform: scale(1.15);
+}
+
+/* ─── Navigation ───────────────────────────────────────────────── */
+.navButtons {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  justify-content: space-between;
+}
+
+.navBtn {
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.navBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.navBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.backBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  transition: all 0.15s;
+}
+
+/* ─── Results ──────────────────────────────────────────────────── */
+.resultsPage {
+  text-align: center;
+  animation: previewFadeIn 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.resultsIcon {
+  font-size: 3rem;
+  margin-bottom: 1.25rem;
+}
+
+.resultsTitle {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.resultsScore {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 1.125rem;
+  margin-bottom: 1.25rem;
+}
+
+.resultsDescription {
+  max-width: 480px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
