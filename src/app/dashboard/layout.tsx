@@ -82,7 +82,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className={styles.dashboardLayout}>
       <aside className={styles.sidebar}>
         <div className={styles.sidebarHeader}>
-          <span className={styles.sidebarBrand}>Studio</span>
+          <span className={styles.sidebarBrand}>ConvertIQ Studio</span>
         </div>
 
         <nav className={styles.sidebarNav}>
