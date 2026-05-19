@@ -235,11 +235,22 @@ export const defaultDesign: DesignConfig = {
   },
 };
 
+/* ─── Project ───────────────────────────────────────────────────── */
+
+export interface Project {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
 /* ─── Questionnaire ─────────────────────────────────────────────── */
 
 export interface Questionnaire {
   id: string;
   user_id: string;
+  project_id: string;
   title: string;
   slug: string;
   custom_domain?: string;
