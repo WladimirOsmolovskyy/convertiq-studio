@@ -84,7 +84,4 @@ The env banner lives in `src/app/layout.tsx`.
 
 **Supabase migrations:** apply manually to both projects (Free tier, no branching). Workflow: `supabase link --project-ref <ref>` then `supabase db push`. Always test against staging first.
 
-## Notes
-
-- The Next.js version installed has breaking changes from common training data. When unsure about an API, check `node_modules/next/dist/docs/` rather than assuming.
-- iCloud Drive used to race on `.next/` writes in the previous repo location — the project has been moved to `/Users/wladimir/Programming/convertiq-studio` (outside iCloud) which fixed it.
+@AGENTS.md
