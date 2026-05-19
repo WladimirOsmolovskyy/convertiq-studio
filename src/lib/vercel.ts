@@ -18,6 +18,14 @@ const PROJECT_ID = process.env.VERCEL_PROJECT_ID;
 const TEAM_ID = process.env.VERCEL_TEAM_ID;
 const API_BASE = 'https://api.vercel.com';
 
+/**
+ * Domains added from staging attach to the `staging` branch (so they serve
+ * preview deploys). Domains added from production attach to the project's
+ * production branch (the default — we pass no gitBranch). This lets users
+ * test custom domains on staging before going live on prod.
+ */
+const TARGET_BRANCH = process.env.VERCEL_ENV === 'preview' ? 'staging' : undefined;
+
 export const isMocked = !TOKEN || !PROJECT_ID;
 
 if (isMocked && typeof process !== 'undefined' && process.env.NEXT_PUBLIC_VERCEL_ENV) {
@@ -66,7 +74,10 @@ export async function addDomain(domain: string): Promise<AddDomainResult> {
   }
   const res = await vercelFetch(`/v10/projects/${PROJECT_ID}/domains${teamQuery()}`, {
     method: 'POST',
-    body: JSON.stringify({ name: domain }),
+    body: JSON.stringify({
+      name: domain,
+      ...(TARGET_BRANCH ? { gitBranch: TARGET_BRANCH } : {}),
+    }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
