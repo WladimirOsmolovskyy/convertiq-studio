@@ -28,11 +28,8 @@ export async function POST(_req: Request, { params }: Ctx) {
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  const nextStatus = status.verified
-    ? 'verified'
-    : status.misconfigured
-      ? 'error'
-      : 'verifying';
+  const nextStatus =
+    status.verified && !status.misconfigured ? 'verified' : 'pending';
 
   const { data: updated, error: updErr } = await supabase
     .from('project_domains')

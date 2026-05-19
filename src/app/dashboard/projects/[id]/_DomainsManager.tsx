@@ -246,11 +246,8 @@ export default function DomainsManager({
                     </button>
                   </div>
                 </div>
-                {showInstructions && records.length > 0 && <DnsInstructions records={records} />}
-                {d.verification_status === 'error' && (
-                  <div className={styles.errorInline}>
-                    DNS misconfigured. Check that the record above is set correctly, then refresh.
-                  </div>
+                {showInstructions && (
+                  <DnsInstructions domain={d.domain} ownershipRecords={records} />
                 )}
               </div>
             );
@@ -261,7 +258,18 @@ export default function DomainsManager({
   );
 }
 
-function DnsInstructions({ records }: { records: VercelVerificationRecord[] }) {
+function DnsInstructions({
+  domain,
+  ownershipRecords,
+}: {
+  domain: string;
+  ownershipRecords: VercelVerificationRecord[];
+}) {
+  // For apex domains (e.g. example.com) Vercel needs A records, not CNAME.
+  // Heuristic: a domain with exactly two dotless segments is the apex.
+  const isApex = domain.split('.').length === 2;
+  const subdomain = isApex ? '@' : domain.split('.').slice(0, -2).join('.');
+
   return (
     <div className={styles.dns}>
       <div className={styles.dnsHeader}>Add this DNS record at your registrar:</div>
@@ -274,7 +282,20 @@ function DnsInstructions({ records }: { records: VercelVerificationRecord[] }) {
           </tr>
         </thead>
         <tbody>
-          {records.map((r, i) => (
+          {isApex ? (
+            <tr>
+              <td>A</td>
+              <td><code>@</code></td>
+              <td><code>76.76.21.21</code></td>
+            </tr>
+          ) : (
+            <tr>
+              <td>CNAME</td>
+              <td><code>{subdomain}</code></td>
+              <td><code>cname.vercel-dns.com</code></td>
+            </tr>
+          )}
+          {ownershipRecords.map((r, i) => (
             <tr key={i}>
               <td>{r.type}</td>
               <td><code>{r.domain}</code></td>
@@ -283,6 +304,9 @@ function DnsInstructions({ records }: { records: VercelVerificationRecord[] }) {
           ))}
         </tbody>
       </table>
+      <div className={styles.dnsHint}>
+        After saving the record, click Refresh. DNS propagation usually takes 1–10 minutes.
+      </div>
     </div>
   );
 }

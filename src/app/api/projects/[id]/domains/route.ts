@@ -53,7 +53,11 @@ export async function POST(request: Request, { params }: Ctx) {
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  const status = vercelResult.verified ? 'verified' : 'pending';
+  // Verified only when ownership-verified AND DNS correctly configured.
+  // For subdomains of domains the user owns, ownership auto-passes — but DNS still
+  // needs a CNAME to cname.vercel-dns.com, so the user has work to do.
+  const status =
+    vercelResult.verified && !vercelResult.misconfigured ? 'verified' : 'pending';
   const vercelData = {
     verification: vercelResult.verification,
     misconfigured: vercelResult.misconfigured,

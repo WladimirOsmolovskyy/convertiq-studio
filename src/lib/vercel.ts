@@ -59,10 +59,10 @@ async function vercelFetch(path: string, init: RequestInit = {}): Promise<Respon
   });
 }
 
-/** Attach a domain to the Vercel project. */
+/** Attach a domain to the Vercel project AND fetch its DNS-config state. */
 export async function addDomain(domain: string): Promise<AddDomainResult> {
   if (isMocked) {
-    return { verified: true, verification: [] };
+    return { verified: true, verification: [], misconfigured: false };
   }
   const res = await vercelFetch(`/v10/projects/${PROJECT_ID}/domains${teamQuery()}`, {
     method: 'POST',
@@ -72,11 +72,20 @@ export async function addDomain(domain: string): Promise<AddDomainResult> {
     const body = await res.json().catch(() => ({}));
     throw new Error(body?.error?.message ?? `Vercel ${res.status}: failed to add domain`);
   }
-  const data = await res.json();
+  const attach = await res.json();
+
+  // Vercel returns `verified: true` for subdomains of domains the user already owns
+  // (ownership auto-passes), but that doesn't mean DNS is set up. The actual DNS state
+  // lives on /v6/domains/{domain}/config.
+  const cfgRes = await vercelFetch(
+    `/v6/domains/${encodeURIComponent(domain)}/config${teamQueryAnd(`projectId=${PROJECT_ID}`)}`,
+  );
+  const cfg = cfgRes.ok ? await cfgRes.json() : {};
+
   return {
-    verified: data.verified ?? false,
-    verification: data.verification ?? [],
-    misconfigured: data.misconfigured ?? false,
+    verified: attach.verified ?? false,
+    verification: attach.verification ?? [],
+    misconfigured: cfg.misconfigured ?? false,
   };
 }
 
