@@ -20,6 +20,13 @@ const API_BASE = 'https://api.vercel.com';
 
 export const isMocked = !TOKEN || !PROJECT_ID;
 
+if (isMocked && typeof process !== 'undefined' && process.env.NEXT_PUBLIC_VERCEL_ENV) {
+  // Surface in Vercel logs why domains come back instantly verified.
+  console.warn(
+    `[vercel.ts] Running in MOCK mode. VERCEL_TOKEN=${TOKEN ? 'set' : 'missing'}, VERCEL_PROJECT_ID=${PROJECT_ID ? 'set' : 'missing'}.`,
+  );
+}
+
 export type AddDomainResult = {
   verified: boolean;
   verification: VercelVerificationRecord[];
