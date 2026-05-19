@@ -35,6 +35,7 @@ interface QuestionnaireState {
   removeScoreResult: (id: string) => void;
   updateTitle: (title: string) => void;
   updateSlug: (slug: string) => void;
+  setDomain: (domainId: string | null) => void;
   togglePublished: () => void;
   hydrate: (data: {
     questionnaire: Questionnaire;
@@ -216,6 +217,11 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
   updateSlug: (slug) => {
     const q = get().questionnaire;
     if (q) set({ questionnaire: { ...q, slug }, isDirty: true });
+  },
+
+  setDomain: (domainId) => {
+    const q = get().questionnaire;
+    if (q) set({ questionnaire: { ...q, domain_id: domainId }, isDirty: true });
   },
 
   togglePublished: () => {

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Check, Pencil, Trash2, X, FolderKanban } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Check, Pencil, Trash2, X, FolderKanban, ArrowRight } from 'lucide-react';
 import type { Project } from '@/lib/types';
 import dashStyles from '../dashboard.module.css';
 import styles from './projects.module.css';
@@ -196,6 +197,13 @@ export default function ProjectsManager({
                   </>
                 ) : (
                   <>
+                    <Link
+                      href={`/dashboard/projects/${p.id}`}
+                      className="btn btn-ghost btn-sm"
+                      title="Open project"
+                    >
+                      <ArrowRight size={14} strokeWidth={1.75} />
+                    </Link>
                     <button
                       className="btn btn-ghost btn-sm"
                       onClick={() => startEdit(p)}

@@ -1,12 +1,53 @@
 import { createClient } from '@/lib/supabase/server';
 import { defaultDesign } from '@/lib/types';
+import { headers } from 'next/headers';
+import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import QuestionnaireRenderer from './QuestionnaireRenderer';
 
+/**
+ * Public questionnaire route. Resolves Host header → project_domain → questionnaire by
+ * (domain_id, slug). Returns 404 if the host isn't a verified custom domain or the
+ * slug doesn't match. There's no fallback for studio.convertiq.de/q/[slug] —
+ * published questionnaires only exist on customer-owned domains.
+ */
+
+function studioHost(host: string | null): boolean {
+  if (!host) return true;
+  const lower = host.toLowerCase().split(':')[0];
+  if (lower === 'studio.convertiq.de') return true;
+  if (lower === 'staging.studio.convertiq.de') return true;
+  if (lower === 'localhost' || lower === '127.0.0.1') return true;
+  if (lower.endsWith('.vercel.app')) return true;
+  return false;
+}
+
+async function resolveDomainId(host: string | null): Promise<string | null> {
+  if (!host || studioHost(host)) return null;
+  const lower = host.toLowerCase().split(':')[0];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('project_domains')
+    .select('id')
+    .eq('domain', lower)
+    .eq('verification_status', 'verified')
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
+  const hdrs = await headers();
+  const domainId = await resolveDomainId(hdrs.get('host'));
+  if (!domainId) return { title: 'Not found' };
   const supabase = await createClient();
-  const { data } = await supabase.from('questionnaires').select('title').eq('slug', slug).eq('is_published', true).single();
+  const { data } = await supabase
+    .from('questionnaires')
+    .select('title')
+    .eq('slug', slug)
+    .eq('domain_id', domainId)
+    .eq('is_published', true)
+    .maybeSingle();
   return {
     title: data?.title || 'Questionnaire',
     description: `Take the "${data?.title || 'Questionnaire'}" interactive questionnaire`,
@@ -15,30 +56,22 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function PublishedPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
+  const hdrs = await headers();
+  const domainId = await resolveDomainId(hdrs.get('host'));
+  if (!domainId) notFound();
+
   const supabase = await createClient();
 
-  // Fetch questionnaire
   const { data: questionnaire } = await supabase
     .from('questionnaires')
     .select('*')
     .eq('slug', slug)
+    .eq('domain_id', domainId)
     .eq('is_published', true)
-    .single();
+    .maybeSingle();
 
-  if (!questionnaire) {
-    return (
-      <div style={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg)', textAlign: 'center', flexDirection: 'column', gap: '1rem',
-      }}>
-        <div style={{ fontSize: '3rem' }}>🔍</div>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)' }}>Questionnaire not found</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>This questionnaire doesn&apos;t exist or is not published.</p>
-      </div>
-    );
-  }
+  if (!questionnaire) notFound();
 
-  // Fetch all related data
   const [questionsRes, designRes, resultsRes] = await Promise.all([
     supabase.from('questions').select('*').eq('questionnaire_id', questionnaire.id).order('sort_order'),
     supabase.from('questionnaire_designs').select('config').eq('questionnaire_id', questionnaire.id).single(),

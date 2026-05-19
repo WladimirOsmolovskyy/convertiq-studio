@@ -1,7 +1,44 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+/**
+ * Hosts where the studio app (dashboard, auth, etc.) is served.
+ * Any host NOT in this set is treated as a customer-owned custom domain,
+ * and root-level paths get rewritten to /q/{slug} so the public route resolves.
+ */
+function isStudioHost(host: string | null): boolean {
+  if (!host) return true; // fail-safe: treat unknown as studio (no rewrite)
+  const lower = host.toLowerCase().split(':')[0];
+  if (lower === 'studio.convertiq.de') return true;
+  if (lower === 'staging.studio.convertiq.de') return true;
+  if (lower === 'localhost' || lower === '127.0.0.1') return true;
+  if (lower.endsWith('.vercel.app')) return true;
+  return false;
+}
+
 export async function proxy(request: NextRequest) {
+  const host = request.headers.get('host');
+  const pathname = request.nextUrl.pathname;
+
+  // Custom-domain rewrite: only on non-studio hosts, only for root-level paths.
+  // /api/*, /_next/*, and the studio routes pass through unchanged on studio hosts.
+  if (!isStudioHost(host)) {
+    const skipRewrite =
+      pathname.startsWith('/api/') ||
+      pathname.startsWith('/_next/') ||
+      pathname.startsWith('/q/') ||
+      pathname === '/favicon.ico';
+    if (!skipRewrite) {
+      const slug = pathname.replace(/^\//, '');
+      if (slug) {
+        const url = request.nextUrl.clone();
+        url.pathname = `/q/${slug}`;
+        return NextResponse.rewrite(url);
+      }
+    }
+  }
+
+  // Auth handling (studio hosts only — supabase cookies live on studio.*)
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -13,7 +50,7 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
           supabaseResponse = NextResponse.next({ request });
@@ -29,15 +66,13 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protect dashboard routes
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  if (!user && pathname.startsWith('/dashboard')) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
-  // Redirect logged-in users away from auth pages
-  if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
+  if (user && (pathname === '/login' || pathname === '/signup')) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);
