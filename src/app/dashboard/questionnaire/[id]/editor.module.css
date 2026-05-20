@@ -1,8 +1,10 @@
 /* ─── Editor Layout ────────────────────────────────────────────── */
+/* Editor sits below the dashboard TopBar — subtract its height so the
+ * page doesn't overflow and our own header doesn't stack under it. */
 .editorShell {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100vh - var(--topbar-height));
   background: var(--bg);
 }
 
@@ -16,7 +18,7 @@
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   border-bottom: 1px solid var(--separator);
   position: sticky;
-  top: 0;
+  top: var(--topbar-height);
   z-index: 20;
   height: var(--header-height);
 }

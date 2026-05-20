@@ -129,6 +129,7 @@ img { max-width: 100%; display: block; }
   /* Layout */
   --sidebar-width: 248px;
   --header-height: 52px;
+  --topbar-height: 44px;
   --content-radius: 12px;
   --content-inset: 8px;
 }

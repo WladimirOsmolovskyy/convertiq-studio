@@ -279,7 +279,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  height: 44px;
+  height: var(--topbar-height);
   padding: 0 1rem;
   border-bottom: 1px solid var(--separator);
   background: var(--toolbar-bg, var(--surface));
@@ -287,7 +287,7 @@
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   position: sticky;
   top: 0;
-  z-index: 25;
+  z-index: 30;
 }
 
 .topBarStatic {

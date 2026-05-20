@@ -94,7 +94,9 @@ export default function LeadDetailPage({
   if (loading) {
     return (
       <div className={styles.body}>
-        <div className="skeleton" style={{ height: 220, borderRadius: 'var(--radius-xl)' }} />
+        <div className={styles.bodyInner}>
+          <div className="skeleton" style={{ height: 220, borderRadius: 'var(--radius-xl)' }} />
+        </div>
       </div>
     );
   }
@@ -102,11 +104,13 @@ export default function LeadDetailPage({
   if (notFound || !lead) {
     return (
       <div className={styles.body}>
-        <div className={styles.empty}>
-          <h2 className={styles.emptyTitle}>Lead not found</h2>
-          <p className={styles.emptyDesc}>
-            This lead may have been deleted or does not belong to this questionnaire.
-          </p>
+        <div className={styles.bodyInner}>
+          <div className={styles.empty}>
+            <h2 className={styles.emptyTitle}>Lead not found</h2>
+            <p className={styles.emptyDesc}>
+              This lead may have been deleted or does not belong to this questionnaire.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -155,6 +159,7 @@ export default function LeadDetailPage({
 
   return (
     <div className={styles.body}>
+      <div className={styles.bodyInner}>
       <div className={styles.detailHeader}>
         <button
           className={styles.backBtn}
@@ -249,6 +254,7 @@ export default function LeadDetailPage({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

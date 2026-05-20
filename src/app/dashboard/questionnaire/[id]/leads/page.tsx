@@ -136,7 +136,9 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
   if (loading) {
     return (
       <div className={styles.body}>
-        <div className="skeleton" style={{ height: 220, borderRadius: 'var(--radius-xl)' }} />
+        <div className={styles.bodyInner}>
+          <div className="skeleton" style={{ height: 220, borderRadius: 'var(--radius-xl)' }} />
+        </div>
       </div>
     );
   }
@@ -144,14 +146,16 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
   if (leads.length === 0) {
     return (
       <div className={styles.body}>
-        <div className={styles.empty}>
-          <div className={styles.emptyIcon}>
-            <Users size={28} strokeWidth={1.5} />
+        <div className={styles.bodyInner}>
+          <div className={styles.empty}>
+            <div className={styles.emptyIcon}>
+              <Users size={28} strokeWidth={1.5} />
+            </div>
+            <h2 className={styles.emptyTitle}>No leads yet</h2>
+            <p className={styles.emptyDesc}>
+              Publish this questionnaire and share the link — completed sessions show up here.
+            </p>
           </div>
-          <h2 className={styles.emptyTitle}>No leads yet</h2>
-          <p className={styles.emptyDesc}>
-            Publish this questionnaire and share the link — completed sessions show up here.
-          </p>
         </div>
       </div>
     );
@@ -159,6 +163,7 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
 
   return (
     <div className={styles.body}>
+      <div className={styles.bodyInner}>
       <div className={styles.table}>
         <div className={`${styles.row} ${styles.header}`}>
           <div className={styles.cell}>Name</div>
@@ -190,6 +195,7 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
             </div>
           </button>
         ))}
+      </div>
       </div>
     </div>
   );
