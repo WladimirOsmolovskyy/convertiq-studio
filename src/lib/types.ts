@@ -245,15 +245,42 @@ export interface Project {
   updated_at: string;
 }
 
+/* ─── Project Domain ───────────────────────────────────────────── */
+
+export type DomainVerificationStatus = 'pending' | 'verifying' | 'verified' | 'error';
+
+/** A Vercel verification record telling the user what DNS to set. */
+export interface VercelVerificationRecord {
+  type: string;   // 'CNAME' | 'TXT' | ...
+  domain: string; // record name
+  value: string;  // record value
+  reason?: string;
+}
+
+export interface ProjectDomain {
+  id: string;
+  project_id: string;
+  domain: string;
+  verification_status: DomainVerificationStatus;
+  vercel_data: {
+    verification?: VercelVerificationRecord[];
+    misconfigured?: boolean;
+    error?: { code?: string; message?: string };
+    [key: string]: unknown;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
 /* ─── Questionnaire ─────────────────────────────────────────────── */
 
 export interface Questionnaire {
   id: string;
   user_id: string;
   project_id: string;
+  domain_id: string | null;
   title: string;
   slug: string;
-  custom_domain?: string;
   is_published: boolean;
   created_at: string;
   updated_at: string;

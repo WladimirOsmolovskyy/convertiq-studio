@@ -19,6 +19,7 @@ import {
   Circle,
 } from 'lucide-react';
 import ImportModal from './ImportModal';
+import PublishPopover from './PublishPopover';
 import styles from './editor.module.css';
 
 const TAB_ICON = { size: 14, strokeWidth: 1.75 } as const;
@@ -114,6 +115,7 @@ export default function EditorLayout({
       const { error: qErr } = await supabase.from('questionnaires').update({
         title: s.questionnaire.title,
         slug: s.questionnaire.slug,
+        domain_id: s.questionnaire.domain_id,
         is_published: s.questionnaire.is_published,
         updated_at: new Date().toISOString(),
       }).eq('id', qId);
@@ -335,14 +337,17 @@ export default function EditorLayout({
             </span>
           )}
 
-          <div className={styles.publishBadge}>
-            <button
-              className={`${styles.toggle} ${store.questionnaire?.is_published ? styles.active : ''}`}
-              onClick={store.togglePublished}
-              aria-label="Toggle published"
+          {store.questionnaire && (
+            <PublishPopover
+              projectId={store.questionnaire.project_id}
+              domainId={store.questionnaire.domain_id}
+              slug={store.questionnaire.slug}
+              isPublished={store.questionnaire.is_published}
+              onDomainChange={store.setDomain}
+              onSlugChange={store.updateSlug}
+              onTogglePublished={store.togglePublished}
             />
-            <span>{store.questionnaire?.is_published ? 'Published' : 'Draft'}</span>
-          </div>
+          )}
           <button className="btn btn-secondary btn-sm" onClick={() => setShowImport(true)}>
             <Download size={13} strokeWidth={2} /> Import
           </button>
