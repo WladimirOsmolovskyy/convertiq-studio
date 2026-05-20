@@ -6,6 +6,7 @@ import TopBar from './TopBar';
 import LayerTree from './LayerTree';
 import Properties from './Properties';
 import EditorStage from './Stage';
+import VariablesPanel from './VariablesPanel';
 import styles from '../ads.module.css';
 
 export default function Editor() {
@@ -16,6 +17,7 @@ export default function Editor() {
       <div className={styles.editorBody}>
         <aside className={styles.leftPanel}>
           <LayerTree />
+          <VariablesPanel />
         </aside>
         <main className={styles.centerArea}>
           <EditorStage stageRef={stageRef} />

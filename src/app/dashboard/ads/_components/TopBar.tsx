@@ -1,28 +1,34 @@
 'use client';
 
-import { useEffect } from 'react';
-import { ArrowLeft, Undo2, Redo2, Download } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, Undo2, Redo2, Save, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type Konva from 'konva';
+import { createClient } from '@/lib/supabase/client';
 import { useEditorStore } from '../_store/editor';
 import { STANDARD_SIZES } from '../_model/nodes';
-import { TEMPLATES, getTemplate } from '../_templates/registry';
-import { exportStageToPng, downloadDataUrl } from '../_export/png';
 import styles from '../ads.module.css';
 
 interface Props {
   stageRef: React.RefObject<Konva.Stage | null>;
 }
 
-export default function TopBar({ stageRef }: Props) {
+export default function TopBar({ stageRef: _stageRef }: Props) {
+  void _stageRef;
   const router = useRouter();
+  const templateId = useEditorStore((s) => s.templateId);
+  const templateTitle = useEditorStore((s) => s.templateTitle);
+  const setTemplateTitle = useEditorStore((s) => s.setTemplateTitle);
   const doc = useEditorStore((s) => s.doc);
+  const variables = useEditorStore((s) => s.variables);
   const edit = useEditorStore((s) => s.edit);
-  const loadDocument = useEditorStore((s) => s.loadDocument);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
   const past = useEditorStore((s) => s.past);
   const future = useEditorStore((s) => s.future);
+
+  const [saving, setSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -52,44 +58,55 @@ export default function TopBar({ stageRef }: Props) {
     });
   };
 
-  const handleTemplate = (id: string) => {
-    if (!confirm('Load template? Unsaved changes will be lost.')) return;
-    loadDocument(getTemplate(id));
+  const handleSave = async () => {
+    if (!templateId) return;
+    setSaving(true);
+    try {
+      const supabase = createClient();
+      // Mirror variables into the document too so reads via either path work.
+      const documentToSave = { ...doc, variables };
+      const { error } = await supabase
+        .from('ad_templates')
+        .update({
+          title: templateTitle,
+          document: documentToSave,
+          variables,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', templateId);
+      if (error) throw error;
+      setLastSavedAt(new Date());
+    } catch (err) {
+      console.error('Save failed', err);
+      alert('Save failed. See console.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleExport = async () => {
-    if (!stageRef.current) return;
-    try {
-      const dataUrl = await exportStageToPng(stageRef.current, doc, 2);
-      const safe = doc.name.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
-      downloadDataUrl(dataUrl, `${safe}-${doc.size.width}x${doc.size.height}.png`);
-    } catch (err) {
-      console.error('Export failed', err);
-      alert('Export failed. See console.');
-    }
+  const handleGenerate = () => {
+    if (!templateId) return;
+    router.push(`/dashboard/ads/templates/${templateId}/generate`);
   };
 
   return (
     <div className={styles.topBar}>
       <button
         className={styles.topBarBack}
-        onClick={() => router.push('/dashboard')}
+        onClick={() => router.push('/dashboard/ads/templates')}
         aria-label="Back"
       >
         <ArrowLeft size={17} strokeWidth={1.75} />
       </button>
-      <div className={styles.topBarTitle}>{doc.name}</div>
+      <input
+        className={styles.topBarTitleInput}
+        value={templateTitle}
+        onChange={(e) => setTemplateTitle(e.target.value)}
+        placeholder="Untitled Ad Template"
+        aria-label="Template title"
+      />
 
       <div className={styles.topBarGroup}>
-        <select
-          className={styles.topBarSelect}
-          value="default"
-          onChange={(e) => handleTemplate(e.target.value)}
-        >
-          {TEMPLATES.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
         <select
           className={styles.topBarSelect}
           value={currentSizeKey}
@@ -125,8 +142,24 @@ export default function TopBar({ stageRef }: Props) {
           <Redo2 size={15} strokeWidth={1.75} />
         </button>
       </div>
-      <button className="btn btn-primary btn-sm" onClick={handleExport}>
-        <Download size={13} strokeWidth={2} /> Export PNG
+      {lastSavedAt && (
+        <span className={styles.topBarHint}>
+          Saved {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </span>
+      )}
+      <button
+        className="btn btn-secondary btn-sm"
+        onClick={handleSave}
+        disabled={saving || !templateId}
+      >
+        <Save size={13} strokeWidth={2} /> {saving ? 'Saving…' : 'Save'}
+      </button>
+      <button
+        className="btn btn-primary btn-sm"
+        onClick={handleGenerate}
+        disabled={!templateId}
+      >
+        <Sparkles size={13} strokeWidth={2} /> Generate
       </button>
     </div>
   );

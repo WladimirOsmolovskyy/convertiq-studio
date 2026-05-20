@@ -20,11 +20,17 @@ import type { Project } from '@/lib/types';
 import ProjectSwitcher from './ProjectSwitcher';
 import styles from '../dashboard.module.css';
 
+type NavChild = {
+  label: string;
+  path: string;
+  match?: (pathname: string) => boolean;
+};
 type NavItem = {
   label: string;
   icon: ReactNode;
   path: string;
   match?: (pathname: string) => boolean;
+  children?: NavChild[];
 };
 type NavSection = { title?: string; items: NavItem[] };
 
@@ -61,7 +67,24 @@ export default function SidebarInner({
           path: '/dashboard',
           match: (p) => p === '/dashboard' || p.startsWith('/dashboard/questionnaire'),
         },
-        { label: 'Ads', icon: <Megaphone {...ip} />, path: '/dashboard/ads' },
+        {
+          label: 'Ads',
+          icon: <Megaphone {...ip} />,
+          path: '/dashboard/ads/templates',
+          match: (p) => p === '/dashboard/ads' || p.startsWith('/dashboard/ads/'),
+          children: [
+            {
+              label: 'Templates',
+              path: '/dashboard/ads/templates',
+              match: (p) => p === '/dashboard/ads' || p.startsWith('/dashboard/ads/templates'),
+            },
+            {
+              label: 'Generations',
+              path: '/dashboard/ads/generations',
+              match: (p) => p.startsWith('/dashboard/ads/generations'),
+            },
+          ],
+        },
         { label: 'Brand', icon: <Palette {...ip} />, path: '/dashboard/brand' },
         { label: 'Copy', icon: <PenLine {...ip} />, path: '/dashboard/copy' },
       ],
@@ -87,7 +110,7 @@ export default function SidebarInner({
     },
   ];
 
-  const isActive = (item: NavItem) =>
+  const isActive = (item: { match?: (p: string) => boolean; path: string }) =>
     item.match ? item.match(pathname) : pathname === item.path;
 
   // Warm every sidebar route on mount so first-click lag in dev disappears.
@@ -96,6 +119,9 @@ export default function SidebarInner({
     for (const section of sections) {
       for (const item of section.items) {
         router.prefetch(item.path);
+        for (const child of item.children ?? []) {
+          router.prefetch(child.path);
+        }
       }
     }
     // sections is constructed inline above; dependency on router only.
@@ -119,16 +145,33 @@ export default function SidebarInner({
               {section.title && (
                 <div className={styles.sidebarSection}>{section.title}</div>
               )}
-              {section.items.map((item) => (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  className={`${styles.navItem} ${isActive(item) ? styles.active : ''}`}
-                >
-                  <span className={styles.navIcon}>{item.icon}</span>
-                  {item.label}
-                </Link>
-              ))}
+              {section.items.map((item) => {
+                const itemActive = isActive(item);
+                return (
+                  <div key={item.path}>
+                    <Link
+                      href={item.path}
+                      className={`${styles.navItem} ${itemActive ? styles.active : ''}`}
+                    >
+                      <span className={styles.navIcon}>{item.icon}</span>
+                      {item.label}
+                    </Link>
+                    {item.children && itemActive && (
+                      <div className={styles.navChildren}>
+                        {item.children.map((child) => (
+                          <Link
+                            key={child.path}
+                            href={child.path}
+                            className={`${styles.navChild} ${isActive(child) ? styles.navChildActive : ''}`}
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ))}
         </nav>
