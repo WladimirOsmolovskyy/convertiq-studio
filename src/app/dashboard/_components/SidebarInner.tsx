@@ -14,10 +14,24 @@ import {
   LogOut,
   FolderKanban,
 } from 'lucide-react';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Project } from '@/lib/types';
 import ProjectSwitcher from './ProjectSwitcher';
+import TopBar from './TopBar';
 import styles from '../dashboard.module.css';
+
+const QUESTIONNAIRE_LS_KEY = 'convertiq.activeQuestionnaireId';
+
+type QuestionnaireLite = {
+  id: string;
+  title: string;
+  slug: string;
+  is_published: boolean;
+  updated_at: string;
+  domain?: { domain: string } | null;
+};
+
+type AdTemplateLite = { id: string; title: string; updated_at: string };
 
 type NavChild = {
   label: string;
@@ -38,14 +52,46 @@ export default function SidebarInner({
   projects,
   activeProjectId,
   userEmail,
+  questionnaires,
+  adTemplates,
 }: {
   children: React.ReactNode;
   projects: Project[];
   activeProjectId: string;
   userEmail: string;
+  questionnaires: QuestionnaireLite[];
+  adTemplates: AdTemplateLite[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
+
+  // Active questionnaire id: URL > localStorage > first available
+  const urlQuestionnaireId = useMemo(() => {
+    const m = pathname.match(/^\/dashboard\/questionnaire\/([^/]+)/);
+    return m?.[1] ?? null;
+  }, [pathname]);
+
+  const [storedQuestionnaireId, setStoredQuestionnaireId] = useState<string | null>(null);
+  // Bridge localStorage into React state: read once on mount; write + update
+  // whenever the URL switches to a different questionnaire.
+  useEffect(() => {
+    try {
+      setStoredQuestionnaireId(localStorage.getItem(QUESTIONNAIRE_LS_KEY));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    if (!urlQuestionnaireId) return;
+    try {
+      localStorage.setItem(QUESTIONNAIRE_LS_KEY, urlQuestionnaireId);
+    } catch {}
+    setStoredQuestionnaireId(urlQuestionnaireId);
+  }, [urlQuestionnaireId]);
+
+  const activeQuestionnaireId =
+    urlQuestionnaireId ??
+    (storedQuestionnaireId && questionnaires.some((q) => q.id === storedQuestionnaireId)
+      ? storedQuestionnaireId
+      : questionnaires[0]?.id ?? null);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -55,6 +101,51 @@ export default function SidebarInner({
   };
 
   const ip = { size: 17, strokeWidth: 1.75 };
+
+  const qTab = (tab: string) =>
+    activeQuestionnaireId ? `/dashboard/questionnaire/${activeQuestionnaireId}/${tab}` : '/dashboard';
+
+  const questionnaireChildren: NavChild[] = [
+    {
+      label: 'Overview',
+      path: '/dashboard',
+      match: (p) => p === '/dashboard',
+    },
+    {
+      label: 'Content',
+      path: qTab('content'),
+      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/content/.test(p),
+    },
+    {
+      label: 'Logic',
+      path: qTab('logic'),
+      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/logic/.test(p),
+    },
+    {
+      label: 'Scoring',
+      path: qTab('scoring'),
+      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/scoring/.test(p),
+    },
+    {
+      label: 'Design',
+      path: qTab('design'),
+      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/design/.test(p),
+    },
+    {
+      label: 'Preview',
+      path: qTab('preview'),
+      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/preview/.test(p),
+    },
+    {
+      label: 'Leads',
+      path: activeQuestionnaireId
+        ? `/dashboard/questionnaire/${activeQuestionnaireId}/leads`
+        : '/dashboard/leads',
+      match: (p) =>
+        p.startsWith('/dashboard/leads') ||
+        /^\/dashboard\/questionnaire\/[^/]+\/leads/.test(p),
+    },
+  ];
 
   const sections: NavSection[] = [
     {
@@ -68,18 +159,7 @@ export default function SidebarInner({
             p === '/dashboard' ||
             p.startsWith('/dashboard/questionnaire') ||
             p.startsWith('/dashboard/leads'),
-          children: [
-            {
-              label: 'All',
-              path: '/dashboard',
-              match: (p) => p === '/dashboard' || p.startsWith('/dashboard/questionnaire'),
-            },
-            {
-              label: 'Leads',
-              path: '/dashboard/leads',
-              match: (p) => p.startsWith('/dashboard/leads'),
-            },
-          ],
+          children: questionnaireChildren,
         },
         {
           label: 'Ads',
@@ -207,7 +287,14 @@ export default function SidebarInner({
         </div>
       </aside>
 
-      <main className={styles.mainContent}>{children}</main>
+      <main className={styles.mainContent}>
+        <TopBar
+          questionnaires={questionnaires}
+          adTemplates={adTemplates}
+          activeProjectId={activeProjectId}
+        />
+        {children}
+      </main>
     </div>
   );
 }

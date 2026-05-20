@@ -1,18 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, use, type ReactNode } from 'react';
+import { useEffect, useState, useCallback, useRef, use } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import { defaultDesign } from '@/lib/types';
 import {
   ArrowLeft,
-  FileText,
-  GitBranch,
-  Target,
-  Paintbrush,
-  Play,
-  Users,
   Download,
   Loader2,
   Check,
@@ -22,17 +16,6 @@ import {
 import ImportModal from './ImportModal';
 import PublishPopover from './PublishPopover';
 import styles from './editor.module.css';
-
-const TAB_ICON = { size: 14, strokeWidth: 1.75 } as const;
-
-const TABS: ReadonlyArray<{ key: string; label: string; icon: ReactNode }> = [
-  { key: 'content', label: 'Content', icon: <FileText {...TAB_ICON} /> },
-  { key: 'logic', label: 'Logic', icon: <GitBranch {...TAB_ICON} /> },
-  { key: 'scoring', label: 'Scoring', icon: <Target {...TAB_ICON} /> },
-  { key: 'design', label: 'Design', icon: <Paintbrush {...TAB_ICON} /> },
-  { key: 'preview', label: 'Preview', icon: <Play {...TAB_ICON} /> },
-  { key: 'leads', label: 'Leads', icon: <Users {...TAB_ICON} /> },
-];
 
 const AUTO_SAVE_DELAY = 2000; // ms after last change
 
@@ -269,6 +252,15 @@ export default function EditorLayout({
     };
   }, [saveAll]);
 
+  /* ─── Force-save when entering preview tab ────────────────── */
+  // Previously the tabs row triggered a save before navigating to preview.
+  // Sidebar-driven nav skips that handler, so do it here based on pathname.
+  useEffect(() => {
+    if (activeTab !== 'preview') return;
+    const s = useQuestionnaireStore.getState();
+    if (s.isDirty) saveAll();
+  }, [activeTab, saveAll]);
+
   /* ─── Save on page unload / navigation away ───────────────── */
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -363,27 +355,6 @@ export default function EditorLayout({
             {saveStatus === 'saving' ? 'Saving…' : 'Save'}
           </button>
         </div>
-      </div>
-
-      {/* Tabs */}
-      <div className={styles.editorTabs}>
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            className={`${styles.editorTab} ${activeTab === tab.key ? styles.active : ''} ${tab.key === 'preview' ? styles.previewTab : ''}`}
-            onClick={async () => {
-              // Auto-save before entering preview so responses save correctly
-              if (tab.key === 'preview') {
-                const s = useQuestionnaireStore.getState();
-                if (s.isDirty) await saveAll();
-              }
-              router.push(`/dashboard/questionnaire/${id}/${tab.key}`);
-            }}
-          >
-            <span className={styles.tabIcon}>{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
       </div>
 
       {/* Import Modal */}
