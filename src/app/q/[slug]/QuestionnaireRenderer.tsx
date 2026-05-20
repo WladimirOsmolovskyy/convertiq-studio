@@ -130,19 +130,27 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
     const matched = scoreResults.find((r) => score >= r.min_score && score <= r.max_score);
     setMatchedResult(matched || null);
 
-    // Save response to Supabase
+    // Save response to Supabase. We generate the response id client-side so the
+    // insert+answers chain doesn't depend on reading the row back — the SELECT RLS
+    // policy on `responses` requires `auth.uid()` to be the questionnaire owner,
+    // so anonymous visitors on custom domains cannot read their just-inserted row.
     try {
       const supabase = createClient();
-      const { data: response } = await supabase.from('responses').insert({
+      const responseId = crypto.randomUUID();
+      const { error: insertErr } = await supabase.from('responses').insert({
+        id: responseId,
         questionnaire_id: questionnaire.id,
         session_id: sessionId,
         total_score: score,
         result_id: matched?.id || null,
         completed_at: new Date().toISOString(),
-        metadata: { user_agent: navigator.userAgent },
-      }).select().single();
+        metadata: {
+          user_agent: navigator.userAgent,
+          host: window.location.hostname,
+        },
+      });
 
-      if (response) {
+      if (!insertErr) {
         const answerRows = Object.entries(answers).map(([questionId, ans]) => {
           const rule = scoringRules.find((r) => r.question_id === questionId);
           let qScore = 0;
@@ -158,7 +166,7 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
           }
 
           return {
-            response_id: response.id,
+            response_id: responseId,
             question_id: questionId,
             answer: ans,
             score: qScore,

@@ -9,7 +9,6 @@ import {
   Palette,
   PenLine,
   LayoutGrid,
-  BarChart3,
   BookOpen,
   Settings,
   LogOut,
@@ -65,7 +64,22 @@ export default function SidebarInner({
           label: 'Questionnaires',
           icon: <ClipboardList {...ip} />,
           path: '/dashboard',
-          match: (p) => p === '/dashboard' || p.startsWith('/dashboard/questionnaire'),
+          match: (p) =>
+            p === '/dashboard' ||
+            p.startsWith('/dashboard/questionnaire') ||
+            p.startsWith('/dashboard/responses'),
+          children: [
+            {
+              label: 'All',
+              path: '/dashboard',
+              match: (p) => p === '/dashboard' || p.startsWith('/dashboard/questionnaire'),
+            },
+            {
+              label: 'Responses',
+              path: '/dashboard/responses',
+              match: (p) => p.startsWith('/dashboard/responses'),
+            },
+          ],
         },
         {
           label: 'Ads',
@@ -98,7 +112,6 @@ export default function SidebarInner({
     {
       title: 'Activity',
       items: [
-        { label: 'Responses', icon: <BarChart3 {...ip} />, path: '/dashboard/responses' },
         { label: 'Import Docs', icon: <BookOpen {...ip} />, path: '/docs' },
       ],
     },
