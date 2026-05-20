@@ -12,6 +12,7 @@ import {
   Target,
   Paintbrush,
   Play,
+  Users,
   Download,
   Loader2,
   Check,
@@ -30,6 +31,7 @@ const TABS: ReadonlyArray<{ key: string; label: string; icon: ReactNode }> = [
   { key: 'scoring', label: 'Scoring', icon: <Target {...TAB_ICON} /> },
   { key: 'design', label: 'Design', icon: <Paintbrush {...TAB_ICON} /> },
   { key: 'preview', label: 'Preview', icon: <Play {...TAB_ICON} /> },
+  { key: 'leads', label: 'Leads', icon: <Users {...TAB_ICON} /> },
 ];
 
 const AUTO_SAVE_DELAY = 2000; // ms after last change
@@ -55,7 +57,9 @@ export default function EditorLayout({
   const isSavingRef = useRef(false);
   const savedIndicatorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const activeTab = pathname.split('/').pop() || 'content';
+  // Tab segment is always the 5th path part: /dashboard/questionnaire/{id}/{tab}/...
+  // Pull from index 4 so /leads/[leadId] still highlights the Leads tab.
+  const activeTab = pathname.split('/')[4] || 'content';
 
   /* ─── Load data from Supabase ──────────────────────────────── */
   useEffect(() => {

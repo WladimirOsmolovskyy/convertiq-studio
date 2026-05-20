@@ -67,7 +67,7 @@ export default function SidebarInner({
           match: (p) =>
             p === '/dashboard' ||
             p.startsWith('/dashboard/questionnaire') ||
-            p.startsWith('/dashboard/responses'),
+            p.startsWith('/dashboard/leads'),
           children: [
             {
               label: 'All',
@@ -75,9 +75,9 @@ export default function SidebarInner({
               match: (p) => p === '/dashboard' || p.startsWith('/dashboard/questionnaire'),
             },
             {
-              label: 'Responses',
-              path: '/dashboard/responses',
-              match: (p) => p.startsWith('/dashboard/responses'),
+              label: 'Leads',
+              path: '/dashboard/leads',
+              match: (p) => p.startsWith('/dashboard/leads'),
             },
           ],
         },
