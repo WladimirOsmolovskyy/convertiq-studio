@@ -1,10 +1,23 @@
 'use client';
 
 import { useMemo } from 'react';
+import { Link2, Link2Off } from 'lucide-react';
 import { useEditorStore } from '../_store/editor';
 import { findNodeAndParent } from '../_model/tree';
 import { computeLayout } from '../_model/autolayout';
-import type { ConstraintAxis, SceneNode, SizingMode } from '../_model/nodes';
+import {
+  findBinding,
+  newVariableId,
+  suggestVariableLabel,
+  typeForProperty,
+} from '../_model/variables';
+import type {
+  AdVariable,
+  AdVariableProperty,
+  ConstraintAxis,
+  SceneNode,
+  SizingMode,
+} from '../_model/nodes';
 import styles from '../ads.module.css';
 
 const CONSTRAINT_OPTIONS: { value: ConstraintAxis; label: string }[] = [
@@ -24,6 +37,9 @@ export default function Properties() {
   const doc = useEditorStore((s) => s.doc);
   const selectedId = useEditorStore((s) => s.selectedId);
   const editNode = useEditorStore((s) => s.editNode);
+  const variables = useEditorStore((s) => s.variables);
+  const addVariable = useEditorStore((s) => s.addVariable);
+  const removeVariable = useEditorStore((s) => s.removeVariable);
 
   const found = selectedId ? findNodeAndParent(doc.root, selectedId) : null;
   const node = found?.node ?? null;
@@ -183,18 +199,42 @@ export default function Properties() {
       {node.type === 'text' && (
         <Section title="Text">
           <Row label="Content" full>
-            <textarea
-              className={styles.field}
-              value={node.text}
-              rows={3}
-              onChange={(e) => patch((n) => { if (n.type === 'text') n.text = e.target.value; })}
-            />
+            <Bindable
+              variables={variables}
+              node={node}
+              property="text"
+              defaultValue={node.text}
+              onAdd={addVariable}
+              onRemove={removeVariable}
+            >
+              {(bound) => (
+                <textarea
+                  className={`${styles.field} ${bound ? styles.fieldDimmed : ''}`}
+                  value={node.text}
+                  rows={3}
+                  disabled={bound}
+                  onChange={(e) => patch((n) => { if (n.type === 'text') n.text = e.target.value; })}
+                />
+              )}
+            </Bindable>
           </Row>
           <Row label="Size">
-            <NumberInput
-              value={node.fontSize}
-              onChange={(v) => patch((n) => { if (n.type === 'text') n.fontSize = v; })}
-            />
+            <Bindable
+              variables={variables}
+              node={node}
+              property="fontSize"
+              defaultValue={node.fontSize}
+              onAdd={addVariable}
+              onRemove={removeVariable}
+            >
+              {(bound) => (
+                <NumberInput
+                  value={node.fontSize}
+                  disabled={bound}
+                  onChange={(v) => patch((n) => { if (n.type === 'text') n.fontSize = v; })}
+                />
+              )}
+            </Bindable>
           </Row>
           <Row label="Weight">
             <select
@@ -206,6 +246,25 @@ export default function Properties() {
                 <option key={w} value={w}>{w}</option>
               ))}
             </select>
+          </Row>
+          <Row label="Font" full>
+            <Bindable
+              variables={variables}
+              node={node}
+              property="fontFamily"
+              defaultValue={node.fontFamily}
+              onAdd={addVariable}
+              onRemove={removeVariable}
+            >
+              {(bound) => (
+                <input
+                  className={`${styles.field} ${bound ? styles.fieldDimmed : ''}`}
+                  value={node.fontFamily}
+                  disabled={bound}
+                  onChange={(e) => patch((n) => { if (n.type === 'text') n.fontFamily = e.target.value; })}
+                />
+              )}
+            </Bindable>
           </Row>
           <Row label="Line">
             <NumberInput
@@ -221,8 +280,23 @@ export default function Properties() {
               onChange={(v) => patch((n) => { if (n.type === 'text') n.letterSpacing = v; })}
             />
           </Row>
-          <Row label="Color">
-            <ColorInput value={node.color} onChange={(v) => patch((n) => { if (n.type === 'text') n.color = v; })} />
+          <Row label="Color" full>
+            <Bindable
+              variables={variables}
+              node={node}
+              property="fill"
+              defaultValue={node.color}
+              onAdd={addVariable}
+              onRemove={removeVariable}
+            >
+              {(bound) => (
+                <ColorInput
+                  value={node.color}
+                  disabled={bound}
+                  onChange={(v) => patch((n) => { if (n.type === 'text') n.color = v; })}
+                />
+              )}
+            </Bindable>
           </Row>
           <Row label="Align">
             <select
@@ -240,8 +314,23 @@ export default function Properties() {
 
       {node.type === 'shape' && (
         <Section title="Shape">
-          <Row label="Fill">
-            <ColorInput value={node.fill || '#000000'} onChange={(v) => patch((n) => { if (n.type === 'shape') n.fill = v; })} />
+          <Row label="Fill" full>
+            <Bindable
+              variables={variables}
+              node={node}
+              property="fill"
+              defaultValue={node.fill || '#000000'}
+              onAdd={addVariable}
+              onRemove={removeVariable}
+            >
+              {(bound) => (
+                <ColorInput
+                  value={node.fill || '#000000'}
+                  disabled={bound}
+                  onChange={(v) => patch((n) => { if (n.type === 'shape') n.fill = v; })}
+                />
+              )}
+            </Bindable>
           </Row>
           {node.shape === 'rect' && (
             <Row label="Radius">
@@ -265,8 +354,23 @@ export default function Properties() {
 
       {node.type === 'frame' && (
         <Section title="Frame">
-          <Row label="Fill">
-            <ColorInput value={node.fill || 'rgba(0,0,0,0)'} onChange={(v) => patch((n) => { if (n.type === 'frame') n.fill = v; })} />
+          <Row label="Fill" full>
+            <Bindable
+              variables={variables}
+              node={node}
+              property="fill"
+              defaultValue={node.fill || 'rgba(0,0,0,0)'}
+              onAdd={addVariable}
+              onRemove={removeVariable}
+            >
+              {(bound) => (
+                <ColorInput
+                  value={node.fill || 'rgba(0,0,0,0)'}
+                  disabled={bound}
+                  onChange={(v) => patch((n) => { if (n.type === 'frame') n.fill = v; })}
+                />
+              )}
+            </Bindable>
           </Row>
           <Row label="Radius">
             <NumberInput
@@ -414,11 +518,23 @@ export default function Properties() {
 
       {node.type === 'icon' && (
         <Section title="Icon">
-          <Row label="Color">
-            <ColorInput
-              value={node.color}
-              onChange={(v) => patch((n) => { if (n.type === 'icon') n.color = v; })}
-            />
+          <Row label="Color" full>
+            <Bindable
+              variables={variables}
+              node={node}
+              property="fill"
+              defaultValue={node.color}
+              onAdd={addVariable}
+              onRemove={removeVariable}
+            >
+              {(bound) => (
+                <ColorInput
+                  value={node.color}
+                  disabled={bound}
+                  onChange={(v) => patch((n) => { if (n.type === 'icon') n.color = v; })}
+                />
+              )}
+            </Bindable>
           </Row>
           <Row label="Stroke">
             <NumberInput
@@ -526,24 +642,84 @@ function SizeField({
   );
 }
 
-function ColorInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ColorInput({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}) {
   const hex = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000';
   return (
     <div className={styles.colorRow}>
       <div className={styles.swatch} style={{ background: value }}>
-        <input
-          type="color"
-          value={hex}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        {!disabled && (
+          <input
+            type="color"
+            value={hex}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        )}
       </div>
       <input
         type="text"
-        className={styles.field}
+        className={`${styles.field} ${disabled ? styles.fieldDimmed : ''}`}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         spellCheck={false}
       />
+    </div>
+  );
+}
+
+function Bindable({
+  variables,
+  node,
+  property,
+  defaultValue,
+  onAdd,
+  onRemove,
+  children,
+}: {
+  variables: AdVariable[];
+  node: SceneNode;
+  property: AdVariableProperty;
+  defaultValue: string | number;
+  onAdd: (v: AdVariable) => void;
+  onRemove: (id: string) => void;
+  children: (bound: boolean) => React.ReactNode;
+}) {
+  const bound = findBinding(variables, node.id, property);
+  const handle = () => {
+    if (bound) {
+      onRemove(bound.id);
+      return;
+    }
+    onAdd({
+      id: newVariableId(),
+      label: suggestVariableLabel(node, property),
+      nodeId: node.id,
+      property,
+      type: typeForProperty(property),
+      defaultValue,
+    });
+  };
+  return (
+    <div className={styles.bindRow}>
+      <div className={styles.bindControl}>{children(!!bound)}</div>
+      <button
+        type="button"
+        className={`${styles.bindBtn} ${bound ? styles.bindBtnActive : ''}`}
+        onClick={handle}
+        title={bound ? `Variable: ${bound.label} · click to unbind` : 'Make variable'}
+        aria-label={bound ? 'Unbind variable' : 'Make variable'}
+      >
+        {bound ? <Link2 size={12} strokeWidth={2} /> : <Link2Off size={12} strokeWidth={2} />}
+      </button>
+      {bound && <div className={styles.bindChip}>{bound.label}</div>}
     </div>
   );
 }

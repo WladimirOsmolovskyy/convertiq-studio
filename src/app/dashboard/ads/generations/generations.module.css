@@ -1,0 +1,37 @@
+.pickerWrap {
+  position: relative;
+}
+.pickerMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 0.4rem;
+  min-width: 240px;
+  z-index: 40;
+}
+.pickerHint {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 0.4rem 0.5rem;
+}
+.pickerItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0.5rem 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--text);
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.pickerItem:hover { background: var(--fill-quaternary); }

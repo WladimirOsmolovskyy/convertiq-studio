@@ -193,6 +193,32 @@
 }
 .navIcon svg { width: 17px; height: 17px; }
 
+.navChildren {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 4px 1.85rem;
+  padding-left: 0.4rem;
+  border-left: 1px solid var(--separator);
+}
+.navChild {
+  display: flex;
+  align-items: center;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  cursor: pointer;
+}
+.navChild:hover { background: var(--fill-quaternary); color: var(--text); }
+.navChildActive {
+  background: var(--fill-tertiary);
+  color: var(--text);
+}
+
 .sidebarFooter {
   padding: 0.5rem 0.625rem 0.75rem;
 }
