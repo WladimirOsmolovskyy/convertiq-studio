@@ -335,6 +335,67 @@
   min-width: 0;
 }
 
+/* Split trigger: inline-editable title + separate chevron. */
+.topBarTriggerSplit {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 7px;
+  border: 1px solid transparent;
+}
+.topBarTriggerSplit:hover {
+  background: var(--fill-quaternary);
+}
+.topBarTriggerSplit:focus-within {
+  background: var(--fill-quaternary);
+  border-color: var(--separator);
+}
+.topBarTriggerInput {
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 0.3rem 0.4rem 0.3rem 0.55rem;
+  min-width: 0;
+  width: 240px;
+  max-width: 320px;
+}
+.topBarTriggerChevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 2px;
+  border: 0;
+  background: transparent;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.topBarTriggerChevron:hover { background: var(--fill-tertiary); color: var(--text); }
+
+/* Right-side action cluster (status, publish, import, save). */
+.topBarActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.topBarStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0 0.25rem;
+  letter-spacing: -0.004em;
+}
+
 .topBarExtLink {
   width: 28px;
   height: 28px;

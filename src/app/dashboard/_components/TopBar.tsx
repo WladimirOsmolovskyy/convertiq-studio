@@ -11,9 +11,17 @@ import {
   Search,
   ClipboardList,
   Megaphone,
+  Download,
+  Loader2,
+  Check,
+  AlertCircle,
+  Circle,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import { nanoid } from 'nanoid';
+import PublishPopover from '../questionnaire/[id]/PublishPopover';
+import ImportModal from '../questionnaire/[id]/ImportModal';
 import styles from '../dashboard.module.css';
 
 type QuestionnaireLite = {
@@ -132,6 +140,11 @@ export default function TopBar({
 
   if (section === 'none') return null;
 
+  // "Editor context" = we're inside /dashboard/questionnaire/{id}/* and the
+  // store has been hydrated by that page's loader. Only then is it safe to
+  // surface the rename/publish/save/import controls.
+  const editorContext = section === 'questionnaires' && !!urlQuestionnaireId;
+
   return (
     <div className={styles.topBar}>
       {section === 'questionnaires' && (
@@ -139,6 +152,7 @@ export default function TopBar({
           items={questionnaires}
           activeId={activeQuestionnaireId}
           activeProjectId={activeProjectId}
+          editorContext={editorContext}
           onCreated={(id) => {
             try {
               localStorage.setItem(QUESTIONNAIRE_LS_KEY, id);
@@ -147,6 +161,7 @@ export default function TopBar({
           }}
         />
       )}
+      {editorContext && <QuestionnaireEditorActions />}
       {section === 'ads-templates' && (
         <AdTemplatePicker
           items={adTemplates}
@@ -163,16 +178,72 @@ export default function TopBar({
   );
 }
 
+/* ─── Editor-only action cluster ───────────────────────────────── */
+function QuestionnaireEditorActions() {
+  const store = useQuestionnaireStore();
+  const [showImport, setShowImport] = useState(false);
+
+  if (!store.questionnaire) return null;
+
+  const statusContent = (() => {
+    switch (store.saveStatus) {
+      case 'saving':
+        return { icon: <Loader2 size={12} strokeWidth={2} className="animate-spin" />, label: 'Saving', color: 'var(--text-muted)' };
+      case 'saved':
+        return { icon: <Check size={12} strokeWidth={2.25} />, label: 'Saved', color: 'var(--success)' };
+      case 'error':
+        return { icon: <AlertCircle size={12} strokeWidth={2} />, label: 'Error', color: 'var(--error)' };
+      default:
+        return store.isDirty
+          ? { icon: <Circle size={8} strokeWidth={0} fill="currentColor" />, label: 'Unsaved', color: 'var(--warning)' }
+          : { icon: null, label: '', color: 'var(--text-muted)' };
+    }
+  })();
+
+  return (
+    <div className={styles.topBarActions}>
+      {statusContent.label && (
+        <span className={styles.topBarStatus} style={{ color: statusContent.color }}>
+          {statusContent.icon}
+          {statusContent.label}
+        </span>
+      )}
+      <PublishPopover
+        projectId={store.questionnaire.project_id}
+        domainId={store.questionnaire.domain_id}
+        slug={store.questionnaire.slug}
+        isPublished={store.questionnaire.is_published}
+        onDomainChange={store.setDomain}
+        onSlugChange={store.updateSlug}
+        onTogglePublished={store.togglePublished}
+      />
+      <button className="btn btn-secondary btn-sm" onClick={() => setShowImport(true)}>
+        <Download size={13} strokeWidth={2} /> Import
+      </button>
+      <button
+        className="btn btn-primary btn-sm"
+        onClick={() => store.saveAll()}
+        disabled={store.saveStatus === 'saving'}
+      >
+        {store.saveStatus === 'saving' ? 'Saving…' : 'Save'}
+      </button>
+      {showImport && <ImportModal onClose={() => setShowImport(false)} />}
+    </div>
+  );
+}
+
 /* ─── Questionnaire picker ─────────────────────────────────────── */
 function QuestionnairePicker({
   items,
   activeId,
   activeProjectId,
+  editorContext,
   onCreated,
 }: {
   items: QuestionnaireLite[];
   activeId: string | null;
   activeProjectId: string;
+  editorContext: boolean;
   onCreated: (id: string) => void;
 }) {
   const router = useRouter();
@@ -181,7 +252,19 @@ function QuestionnairePicker({
   const [creating, setCreating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const active = items.find((q) => q.id === activeId) ?? null;
+  // In editor context the live title comes from the store (reflects unsaved
+  // typing); otherwise from the server-fetched list.
+  const storeQuestionnaire = useQuestionnaireStore((s) => s.questionnaire);
+  const updateTitle = useQuestionnaireStore((s) => s.updateTitle);
+
+  const listActive = items.find((q) => q.id === activeId) ?? null;
+  const liveTitle =
+    editorContext && storeQuestionnaire?.id === activeId
+      ? storeQuestionnaire.title
+      : listActive?.title ?? '';
+  const active = listActive
+    ? { ...listActive, title: liveTitle || listActive.title }
+    : null;
 
   useEffect(() => {
     if (!open) return;
@@ -247,18 +330,40 @@ function QuestionnairePicker({
 
   return (
     <div className={styles.topBarPicker} ref={ref}>
-      <button
-        type="button"
-        className={styles.topBarTrigger}
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span className={styles.topBarTriggerLabel}>
-          {active?.title ?? 'Select questionnaire'}
-        </span>
-        <ChevronDown size={14} strokeWidth={1.75} />
-      </button>
+      {editorContext && active ? (
+        <div className={styles.topBarTriggerSplit}>
+          <input
+            className={styles.topBarTriggerInput}
+            value={liveTitle}
+            onChange={(e) => updateTitle(e.target.value)}
+            placeholder="Untitled"
+            aria-label="Questionnaire title"
+          />
+          <button
+            type="button"
+            className={styles.topBarTriggerChevron}
+            onClick={() => setOpen((v) => !v)}
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            aria-label="Switch questionnaire"
+          >
+            <ChevronDown size={14} strokeWidth={1.75} />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={styles.topBarTrigger}
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+        >
+          <span className={styles.topBarTriggerLabel}>
+            {active?.title ?? 'Select questionnaire'}
+          </span>
+          <ChevronDown size={14} strokeWidth={1.75} />
+        </button>
+      )}
 
       {publishedUrl && (
         <a

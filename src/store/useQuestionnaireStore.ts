@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import type { Question, QuestionBranch, ScoringRule, ScoreResult, DesignConfig, Questionnaire } from '@/lib/types';
 import { defaultDesign } from '@/lib/types';
+import { createClient } from '@/lib/supabase/client';
+
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 interface QuestionnaireState {
   questionnaire: Questionnaire | null;
@@ -11,6 +14,7 @@ interface QuestionnaireState {
   design: DesignConfig;
   isDirty: boolean;
   isSaving: boolean;
+  saveStatus: SaveStatus;
 
   setQuestionnaire: (q: Questionnaire) => void;
   setQuestions: (q: Question[]) => void;
@@ -46,6 +50,7 @@ interface QuestionnaireState {
     design: DesignConfig;
   }) => void;
   reset: () => void;
+  saveAll: () => Promise<void>;
 }
 
 export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
@@ -57,6 +62,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
   design: defaultDesign,
   isDirty: false,
   isSaving: false,
+  saveStatus: 'idle' as SaveStatus,
 
   setQuestionnaire: (q) => set({ questionnaire: q }),
   setQuestions: (q) => set({ questions: q, isDirty: true }),
@@ -229,8 +235,151 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
     if (q) set({ questionnaire: { ...q, is_published: !q.is_published }, isDirty: true });
   },
 
-  hydrate: (data) => set({ ...data, isDirty: false, isSaving: false }),
+  hydrate: (data) => set({ ...data, isDirty: false, isSaving: false, saveStatus: 'idle' }),
 
   reset: () =>
-    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], scoreResults: [], design: defaultDesign, isDirty: false, isSaving: false }),
+    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], scoreResults: [], design: defaultDesign, isDirty: false, isSaving: false, saveStatus: 'idle' }),
+
+  saveAll: async () => {
+    // Read fresh state on each call so we always persist the latest store.
+    const s = get();
+    if (!s.questionnaire || s.isSaving) return;
+    set({ isSaving: true, saveStatus: 'saving' });
+
+    try {
+      const supabase = createClient();
+      const qId = s.questionnaire.id;
+
+      // 1. Update questionnaire metadata
+      const { error: qErr } = await supabase
+        .from('questionnaires')
+        .update({
+          title: s.questionnaire.title,
+          slug: s.questionnaire.slug,
+          domain_id: s.questionnaire.domain_id,
+          is_published: s.questionnaire.is_published,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', qId);
+      if (qErr) console.error('Save questionnaire failed:', qErr);
+
+      // 2. Delete child records FIRST (RLS checks parent existence)
+      const oldQuestionsRes = await supabase
+        .from('questions')
+        .select('id')
+        .eq('questionnaire_id', qId);
+      const oldQuestionIds = (oldQuestionsRes.data || []).map((q: { id: string }) => q.id);
+
+      if (oldQuestionIds.length > 0) {
+        const { error: bDelErr } = await supabase
+          .from('question_branches')
+          .delete()
+          .in('question_id', oldQuestionIds);
+        if (bDelErr) console.error('Delete branches failed:', bDelErr);
+
+        const { error: sDelErr } = await supabase
+          .from('scoring_rules')
+          .delete()
+          .in('question_id', oldQuestionIds);
+        if (sDelErr) console.error('Delete scoring rules failed:', sDelErr);
+      }
+
+      // 3. Delete old score results
+      const { error: srDelErr } = await supabase
+        .from('score_results')
+        .delete()
+        .eq('questionnaire_id', qId);
+      if (srDelErr) console.error('Delete score results failed:', srDelErr);
+
+      // 4. Delete old questions
+      const { error: qDelErr } = await supabase
+        .from('questions')
+        .delete()
+        .eq('questionnaire_id', qId);
+      if (qDelErr) console.error('Delete questions failed:', qDelErr);
+
+      // 5. Insert new questions
+      if (s.questions.length > 0) {
+        const { error: qInsErr } = await supabase.from('questions').insert(
+          s.questions.map((q) => ({
+            id: q.id,
+            questionnaire_id: qId,
+            type: q.type,
+            title: q.title,
+            description: q.description || null,
+            required: q.required,
+            sort_order: q.sort_order,
+            options: q.options,
+            validation: q.validation || null,
+          })),
+        );
+        if (qInsErr) console.error('Insert questions failed:', qInsErr);
+      }
+
+      // 6. Insert new branches
+      if (s.branches.length > 0) {
+        const { error: bInsErr } = await supabase.from('question_branches').insert(
+          s.branches.map((b) => ({
+            id: b.id,
+            question_id: b.question_id,
+            condition: b.condition,
+            target_question_id: b.target_question_id,
+            is_end: b.is_end,
+          })),
+        );
+        if (bInsErr) console.error('Insert branches failed:', bInsErr);
+      }
+
+      // 7. Insert new scoring rules
+      if (s.scoringRules.length > 0) {
+        const { error: sInsErr } = await supabase.from('scoring_rules').insert(
+          s.scoringRules.map((r) => ({
+            id: r.id,
+            question_id: r.question_id,
+            type: r.type,
+            option_scores: r.option_scores,
+            ai_score_min: r.ai_score_min,
+            ai_score_max: r.ai_score_max,
+            ai_prompt: r.ai_prompt || null,
+          })),
+        );
+        if (sInsErr) console.error('Insert scoring rules failed:', sInsErr);
+      }
+
+      // 8. Insert new score results
+      if (s.scoreResults.length > 0) {
+        const { error: srInsErr } = await supabase.from('score_results').insert(
+          s.scoreResults.map((r) => ({
+            id: r.id,
+            questionnaire_id: qId,
+            min_score: r.min_score,
+            max_score: r.max_score,
+            title: r.title,
+            description: r.description,
+            sort_order: r.sort_order,
+          })),
+        );
+        if (srInsErr) console.error('Insert score results failed:', srInsErr);
+      }
+
+      // 9. Upsert design
+      const { error: dErr } = await supabase
+        .from('questionnaire_designs')
+        .upsert(
+          { questionnaire_id: qId, config: s.design },
+          { onConflict: 'questionnaire_id' },
+        );
+      if (dErr) console.error('Upsert design failed:', dErr);
+
+      set({ isDirty: false, isSaving: false, saveStatus: 'saved' });
+
+      // Drop the "Saved" indicator back to idle after 3s.
+      setTimeout(() => {
+        if (get().saveStatus === 'saved') set({ saveStatus: 'idle' });
+      }, 3000);
+    } catch (err) {
+      console.error('Save failed:', err);
+      set({ isSaving: false, saveStatus: 'error' });
+    }
+  },
 }));
