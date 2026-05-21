@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { ArrowLeft } from 'lucide-react';
 import type { Question, QuestionOption, LeadField } from '@/lib/types';
+import { resolveLeadFields } from '@/lib/leadFields';
 import styles from '../leads.module.css';
 
 type ResponseRow = {
@@ -78,7 +79,7 @@ export default function LeadDetailPage({
           .order('sort_order'),
         supabase
           .from('questionnaires')
-          .select('lead_fields')
+          .select('lead_fields, project:projects(lead_fields)')
           .eq('id', id)
           .maybeSingle(),
       ]);
@@ -92,7 +93,17 @@ export default function LeadDetailPage({
       setLead(respRes.data as ResponseRow);
       setAnswers((answersRes.data || []) as AnswerRow[]);
       setQuestions((questionsRes.data || []) as Question[]);
-      setLeadFieldDefs(((qRes.data?.lead_fields as LeadField[] | undefined) ?? []));
+      const projectFields = (() => {
+        const p = qRes.data?.project as unknown;
+        if (Array.isArray(p)) return (p[0] as { lead_fields?: LeadField[] } | undefined)?.lead_fields;
+        return (p as { lead_fields?: LeadField[] } | null | undefined)?.lead_fields;
+      })();
+      setLeadFieldDefs(
+        resolveLeadFields(
+          projectFields ?? [],
+          (qRes.data?.lead_fields as LeadField[] | undefined) ?? [],
+        ),
+      );
       setLoading(false);
     };
     load();

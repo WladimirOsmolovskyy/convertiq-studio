@@ -241,6 +241,7 @@ export interface Project {
   id: string;
   user_id: string;
   name: string;
+  lead_fields: LeadField[];
   created_at: string;
   updated_at: string;
 }

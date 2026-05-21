@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import type { Question, QuestionBranch, ScoringRule, ScoreResult, DesignConfig, Questionnaire } from '@/lib/types';
+import type { Question, QuestionBranch, ScoringRule, ScoreResult, DesignConfig, Questionnaire, LeadField } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { nanoid } from 'nanoid';
+import { resolveLeadFields } from '@/lib/leadFields';
 import styles from './published.module.css';
 
 interface Props {
@@ -13,9 +14,10 @@ interface Props {
   scoringRules: ScoringRule[];
   scoreResults: ScoreResult[];
   design: DesignConfig;
+  projectLeadFields?: LeadField[];
 }
 
-export default function QuestionnaireRenderer({ questionnaire, questions, branches, scoringRules, scoreResults, design }: Props) {
+export default function QuestionnaireRenderer({ questionnaire, questions, branches, scoringRules, scoreResults, design, projectLeadFields }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, { value?: string; selected_options?: string[] }>>({});
   const [questionPath, setQuestionPath] = useState<number[]>([0]);
@@ -27,9 +29,10 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
   const [rating, setRating] = useState(0);
   const [capturedFields, setCapturedFields] = useState<Record<string, string>>({});
 
-  // Capture URL query params for configured lead_fields on mount.
+  // Capture URL query params for the effective set of lead fields (project
+  // shared + questionnaire-specific) on mount.
   useEffect(() => {
-    const fields = questionnaire.lead_fields ?? [];
+    const fields = resolveLeadFields(projectLeadFields, questionnaire.lead_fields);
     if (fields.length === 0) return;
     const params = new URLSearchParams(window.location.search);
     const captured: Record<string, string> = {};
@@ -39,7 +42,7 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
       if (v) captured[f.urlParam] = v;
     }
     setCapturedFields(captured);
-  }, [questionnaire.lead_fields]);
+  }, [projectLeadFields, questionnaire.lead_fields]);
 
   const currentQuestion = questions[currentIndex];
   const progress = questions.length > 0 ? ((questionPath.length) / questions.length) * 100 : 0;
