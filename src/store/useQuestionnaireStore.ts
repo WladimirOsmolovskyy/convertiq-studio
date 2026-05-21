@@ -44,6 +44,7 @@ interface QuestionnaireState {
   addLeadField: () => void;
   updateLeadField: (id: string, updates: Partial<LeadField>) => void;
   removeLeadField: (id: string) => void;
+  setLeadFieldTemplate: (templateId: string | null) => void;
   hydrate: (data: {
     questionnaire: Questionnaire;
     questions: Question[];
@@ -273,6 +274,15 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
     });
   },
 
+  setLeadFieldTemplate: (templateId) => {
+    const q = get().questionnaire;
+    if (!q) return;
+    set({
+      questionnaire: { ...q, lead_field_template_id: templateId },
+      isDirty: true,
+    });
+  },
+
   hydrate: (data) => set({ ...data, isDirty: false, isSaving: false, saveStatus: 'idle' }),
 
   reset: () =>
@@ -297,6 +307,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
           domain_id: s.questionnaire.domain_id,
           is_published: s.questionnaire.is_published,
           lead_fields: s.questionnaire.lead_fields ?? [],
+          lead_field_template_id: s.questionnaire.lead_field_template_id ?? null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', qId);

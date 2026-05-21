@@ -241,7 +241,6 @@ export interface Project {
   id: string;
   user_id: string;
   name: string;
-  lead_fields: LeadField[];
   created_at: string;
   updated_at: string;
 }
@@ -283,6 +282,15 @@ export interface LeadField {
   urlParam: string;
 }
 
+export interface LeadFieldTemplate {
+  id: string;
+  project_id: string;
+  name: string;
+  fields: LeadField[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Questionnaire {
   id: string;
   user_id: string;
@@ -291,7 +299,11 @@ export interface Questionnaire {
   title: string;
   slug: string;
   is_published: boolean;
+  /** Per-questionnaire lead fields (don't affect siblings or templates). */
   lead_fields: LeadField[];
+  /** Optional FK to a project-scoped LeadFieldTemplate. When set, the template's
+   *  fields are merged with this questionnaire's lead_fields at runtime. */
+  lead_field_template_id: string | null;
   created_at: string;
   updated_at: string;
 }

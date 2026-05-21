@@ -14,10 +14,10 @@ interface Props {
   scoringRules: ScoringRule[];
   scoreResults: ScoreResult[];
   design: DesignConfig;
-  projectLeadFields?: LeadField[];
+  templateLeadFields?: LeadField[];
 }
 
-export default function QuestionnaireRenderer({ questionnaire, questions, branches, scoringRules, scoreResults, design, projectLeadFields }: Props) {
+export default function QuestionnaireRenderer({ questionnaire, questions, branches, scoringRules, scoreResults, design, templateLeadFields }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, { value?: string; selected_options?: string[] }>>({});
   const [questionPath, setQuestionPath] = useState<number[]>([0]);
@@ -29,10 +29,10 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
   const [rating, setRating] = useState(0);
   const [capturedFields, setCapturedFields] = useState<Record<string, string>>({});
 
-  // Capture URL query params for the effective set of lead fields (project
-  // shared + questionnaire-specific) on mount.
+  // Capture URL query params for the effective set of lead fields (template
+  // fields + questionnaire-specific) on mount.
   useEffect(() => {
-    const fields = resolveLeadFields(projectLeadFields, questionnaire.lead_fields);
+    const fields = resolveLeadFields(templateLeadFields, questionnaire.lead_fields);
     if (fields.length === 0) return;
     const params = new URLSearchParams(window.location.search);
     const captured: Record<string, string> = {};
@@ -42,7 +42,7 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
       if (v) captured[f.urlParam] = v;
     }
     setCapturedFields(captured);
-  }, [projectLeadFields, questionnaire.lead_fields]);
+  }, [templateLeadFields, questionnaire.lead_fields]);
 
   const currentQuestion = questions[currentIndex];
   const progress = questions.length > 0 ? ((questionPath.length) / questions.length) * 100 : 0;

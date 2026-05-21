@@ -79,7 +79,7 @@ export default function LeadDetailPage({
           .order('sort_order'),
         supabase
           .from('questionnaires')
-          .select('lead_fields, project:projects(lead_fields)')
+          .select('lead_fields, template:lead_field_templates(fields)')
           .eq('id', id)
           .maybeSingle(),
       ]);
@@ -93,14 +93,14 @@ export default function LeadDetailPage({
       setLead(respRes.data as ResponseRow);
       setAnswers((answersRes.data || []) as AnswerRow[]);
       setQuestions((questionsRes.data || []) as Question[]);
-      const projectFields = (() => {
-        const p = qRes.data?.project as unknown;
-        if (Array.isArray(p)) return (p[0] as { lead_fields?: LeadField[] } | undefined)?.lead_fields;
-        return (p as { lead_fields?: LeadField[] } | null | undefined)?.lead_fields;
+      const templateFields = (() => {
+        const t = qRes.data?.template as unknown;
+        if (Array.isArray(t)) return (t[0] as { fields?: LeadField[] } | undefined)?.fields;
+        return (t as { fields?: LeadField[] } | null | undefined)?.fields;
       })();
       setLeadFieldDefs(
         resolveLeadFields(
-          projectFields ?? [],
+          templateFields ?? [],
           (qRes.data?.lead_fields as LeadField[] | undefined) ?? [],
         ),
       );

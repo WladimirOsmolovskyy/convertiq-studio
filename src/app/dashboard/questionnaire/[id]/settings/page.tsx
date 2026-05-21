@@ -5,30 +5,40 @@ import Link from 'next/link';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import { createClient } from '@/lib/supabase/client';
 import { resolveLeadFields } from '@/lib/leadFields';
-import type { LeadField } from '@/lib/types';
+import type { LeadFieldTemplate } from '@/lib/types';
 import { Plus, Trash2, Link2, ExternalLink } from 'lucide-react';
 import styles from '../editor.module.css';
 
 export default function SettingsPage() {
-  const { questionnaire, addLeadField, updateLeadField, removeLeadField } = useQuestionnaireStore();
+  const {
+    questionnaire,
+    addLeadField,
+    updateLeadField,
+    removeLeadField,
+    setLeadFieldTemplate,
+  } = useQuestionnaireStore();
   const fields = questionnaire?.lead_fields ?? [];
+  const templateId = questionnaire?.lead_field_template_id ?? null;
 
-  const [projectFields, setProjectFields] = useState<LeadField[]>([]);
+  const [templates, setTemplates] = useState<LeadFieldTemplate[]>([]);
   useEffect(() => {
     if (!questionnaire?.project_id) return;
     const supabase = createClient();
     supabase
-      .from('projects')
-      .select('lead_fields')
-      .eq('id', questionnaire.project_id)
-      .maybeSingle()
+      .from('lead_field_templates')
+      .select('*')
+      .eq('project_id', questionnaire.project_id)
+      .order('created_at', { ascending: true })
       .then(({ data }) => {
-        setProjectFields((data?.lead_fields as LeadField[] | undefined) ?? []);
+        setTemplates((data as LeadFieldTemplate[] | null) ?? []);
       });
   }, [questionnaire?.project_id]);
 
+  const selectedTemplate = templates.find((t) => t.id === templateId) ?? null;
+  const templateFields = selectedTemplate?.fields ?? [];
+
   // Effective set drives the example URL — all params we'd capture in practice.
-  const effective = resolveLeadFields(projectFields, fields);
+  const effective = resolveLeadFields(templateFields, fields);
   const exampleParams = effective
     .filter((f) => f.urlParam.trim().length > 0)
     .map((f) => `${encodeURIComponent(f.urlParam)}=value`)
@@ -49,44 +59,69 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        {projectFields.length > 0 && questionnaire?.project_id && (
+        {questionnaire?.project_id && (
           <section style={{ marginBottom: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
               <h3 style={{ fontSize: '1.0625rem', fontWeight: 600, letterSpacing: '-0.012em' }}>
-                Shared fields
+                Lead field template
               </h3>
               <Link
                 href={`/dashboard/projects/${questionnaire.project_id}`}
                 style={{ fontSize: '0.8125rem', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}
               >
-                Edit in project <ExternalLink size={12} strokeWidth={1.75} />
+                Manage templates <ExternalLink size={12} strokeWidth={1.75} />
               </Link>
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', marginBottom: '0.75rem', lineHeight: 1.5 }}>
-              Defined at the project level and applied to every questionnaire automatically.
+              Reusable bundle of URL-tracked fields. Changes to the template propagate to
+              every questionnaire that uses it.
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
-              {projectFields.map((f) => (
-                <div
-                  key={f.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '0.5rem',
-                    alignItems: 'center',
-                    background: 'var(--fill-quaternary)',
-                    border: '1px solid var(--separator)',
-                    borderRadius: 'var(--radius-xl)',
-                    padding: '0.5rem 0.875rem',
-                  }}
-                >
-                  <span style={{ fontSize: '0.8125rem', color: 'var(--text)' }}>{f.label || '—'}</span>
-                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontFamily: "ui-monospace, 'SF Mono', monospace" }}>
-                    {f.urlParam || '—'}
-                  </span>
-                </div>
+            <select
+              value={templateId ?? ''}
+              onChange={(e) => setLeadFieldTemplate(e.target.value || null)}
+              style={{
+                width: '100%',
+                padding: '0.45rem 0.6rem',
+                border: '1px solid var(--separator)',
+                background: 'var(--surface)',
+                borderRadius: 'var(--radius-md)',
+                font: 'inherit',
+                fontSize: '0.875rem',
+                color: 'var(--text)',
+              }}
+            >
+              <option value="">No template</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} · {t.fields?.length ?? 0} fields
+                </option>
               ))}
-            </div>
+            </select>
+
+            {selectedTemplate && templateFields.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem', marginTop: '0.75rem' }}>
+                {templateFields.map((f) => (
+                  <div
+                    key={f.id}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: '0.5rem',
+                      alignItems: 'center',
+                      background: 'var(--fill-quaternary)',
+                      border: '1px solid var(--separator)',
+                      borderRadius: 'var(--radius-xl)',
+                      padding: '0.5rem 0.875rem',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.8125rem', color: 'var(--text)' }}>{f.label || '—'}</span>
+                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontFamily: "ui-monospace, 'SF Mono', monospace" }}>
+                      {f.urlParam || '—'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         )}
 
@@ -104,8 +139,8 @@ export default function SettingsPage() {
             published page. Useful for tracking tags
             (<code>utm_campaign</code>, <code>utm_source</code>) or pre-filled lead data
             (<code>name</code>, <code>email</code>). Adding a field here applies only to
-            this questionnaire; a field with the same URL parameter as a shared one overrides
-            the shared definition&apos;s label.
+            this questionnaire; a field with the same URL parameter as a template field
+            overrides the template&apos;s label.
           </p>
 
           {fields.length === 0 ? (
