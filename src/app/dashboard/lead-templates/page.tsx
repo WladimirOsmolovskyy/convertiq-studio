@@ -4,33 +4,38 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Plus, Trash2, ChevronDown, ChevronRight, Loader2, Check } from 'lucide-react';
 import type { LeadField, LeadFieldTemplate } from '@/lib/types';
-import styles from './detail.module.css';
+import dashStyles from '../dashboard.module.css';
+import styles from './lead-templates.module.css';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
-export default function LeadFieldTemplatesManager({ projectId }: { projectId: string }) {
+export default function LeadTemplatesPage() {
   const [templates, setTemplates] = useState<LeadFieldTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
+    // RLS filters to the current user — no explicit user_id filter needed.
     supabase
       .from('lead_field_templates')
       .select('*')
-      .eq('project_id', projectId)
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         setTemplates((data as LeadFieldTemplate[] | null) ?? []);
         setLoading(false);
       });
-  }, [projectId]);
+  }, []);
 
   const createTemplate = async () => {
     const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
     const { data, error } = await supabase
       .from('lead_field_templates')
-      .insert({ project_id: projectId, name: 'New template', fields: [] })
+      .insert({ user_id: user.id, name: 'New template', fields: [] })
       .select()
       .single();
     if (data && !error) {
@@ -40,7 +45,12 @@ export default function LeadFieldTemplatesManager({ projectId }: { projectId: st
   };
 
   const deleteTemplate = async (id: string) => {
-    if (!confirm('Delete this template? Questionnaires using it will keep their own fields but lose the shared set.')) return;
+    if (
+      !confirm(
+        'Delete this template? Questionnaires using it will keep their own fields but lose the shared set.',
+      )
+    )
+      return;
     const supabase = createClient();
     const { error } = await supabase.from('lead_field_templates').delete().eq('id', id);
     if (!error) setTemplates((prev) => prev.filter((t) => t.id !== id));
@@ -51,31 +61,28 @@ export default function LeadFieldTemplatesManager({ projectId }: { projectId: st
   };
 
   return (
-    <section className={styles.leadFieldsSection}>
-      <div className={styles.leadFieldsHeader}>
-        <div>
-          <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>
-            Lead field templates
-          </h2>
-          <p className={styles.sectionDesc}>
-            Reusable bundles of URL-tracked fields. Apply a template to a questionnaire on
-            its Settings tab. Editing a template updates every questionnaire that uses it;
-            per-questionnaire fields stay local.
-          </p>
-        </div>
-        <button className="btn btn-secondary btn-sm" onClick={createTemplate}>
-          <Plus size={13} strokeWidth={2.25} /> New template
+    <div className={dashStyles.contentBody}>
+      <div className={dashStyles.largeTitleBlock}>
+        <h1 className={dashStyles.largeTitle}>Lead field templates</h1>
+        <button className="btn btn-primary" onClick={createTemplate}>
+          <Plus size={14} strokeWidth={2.5} /> New template
         </button>
       </div>
 
+      <p className={styles.intro}>
+        Reusable bundles of URL-tracked fields, shared across every project. Use them for tracking
+        parameters (Meta, Google, etc.) or pre-filled lead data. Apply a template to a questionnaire
+        from its Settings tab — editing a template updates every questionnaire that uses it.
+      </p>
+
       {loading ? (
-        <div className="skeleton" style={{ height: 80, borderRadius: 'var(--radius-xl)' }} />
+        <div className="skeleton" style={{ height: 120, borderRadius: 'var(--radius-xl)' }} />
       ) : templates.length === 0 ? (
-        <div className={styles.leadFieldsEmpty}>
+        <div className={styles.empty}>
           No templates yet. Click <b>New template</b> to define a reusable set of URL fields.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div className={styles.list}>
           {templates.map((template) => (
             <TemplateCard
               key={template.id}
@@ -88,7 +95,7 @@ export default function LeadFieldTemplatesManager({ projectId }: { projectId: st
           ))}
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -118,8 +125,12 @@ function TemplateCard({
   const editFields = (next: LeadField[]) => edit({ fields: next });
 
   const addField = () =>
-    editFields([...(template.fields || []), { id: crypto.randomUUID(), label: 'New field', urlParam: '' }]);
-  const removeField = (id: string) => editFields((template.fields || []).filter((f) => f.id !== id));
+    editFields([
+      ...(template.fields || []),
+      { id: crypto.randomUUID(), label: 'New field', urlParam: '' },
+    ]);
+  const removeField = (id: string) =>
+    editFields((template.fields || []).filter((f) => f.id !== id));
   const updateField = (id: string, patch: Partial<LeadField>) =>
     editFields((template.fields || []).map((f) => (f.id === id ? { ...f, ...patch } : f)));
 
@@ -145,29 +156,12 @@ function TemplateCard({
   };
 
   return (
-    <div
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--separator)',
-        borderRadius: 'var(--radius-xl)',
-        padding: '0.625rem 0.75rem',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+    <div className={styles.card}>
+      <div className={styles.cardHeader}>
         <button
           onClick={onToggle}
           aria-label={expanded ? 'Collapse' : 'Expand'}
-          style={{
-            width: 24,
-            height: 24,
-            border: 0,
-            background: 'transparent',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-secondary)',
-            cursor: 'pointer',
-          }}
+          className={styles.expand}
         >
           {expanded ? (
             <ChevronDown size={14} strokeWidth={2} />
@@ -179,21 +173,9 @@ function TemplateCard({
           value={template.name}
           onChange={(e) => edit({ name: e.target.value })}
           placeholder="Template name"
-          style={{
-            flex: 1,
-            font: 'inherit',
-            fontSize: '0.9375rem',
-            fontWeight: 600,
-            letterSpacing: '-0.01em',
-            border: 0,
-            background: 'transparent',
-            color: 'var(--text)',
-            padding: '0.25rem 0.4rem',
-            borderRadius: 'var(--radius-md)',
-            outline: 'none',
-          }}
+          className={styles.nameInput}
         />
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+        <span className={styles.count}>
           {(template.fields || []).length} {(template.fields || []).length === 1 ? 'field' : 'fields'}
         </span>
         <button
@@ -207,29 +189,29 @@ function TemplateCard({
       </div>
 
       {expanded && (
-        <div style={{ marginTop: '0.625rem', paddingLeft: '1.5rem' }}>
+        <div className={styles.body}>
           {(template.fields || []).length > 0 && (
-            <div className={styles.leadFieldsRowHeader} style={{ marginBottom: '0.25rem' }}>
+            <div className={styles.rowHeader}>
               <span>Label</span>
               <span>URL parameter</span>
               <span></span>
             </div>
           )}
-          <div className={styles.leadFieldsList}>
+          <div className={styles.fieldList}>
             {(template.fields || []).map((field) => (
-              <div key={field.id} className={styles.leadFieldsRow}>
+              <div key={field.id} className={styles.row}>
                 <input
                   value={field.label}
                   onChange={(e) => updateField(field.id, { label: e.target.value })}
                   placeholder="Display label"
-                  className={styles.leadFieldsInput}
+                  className={styles.input}
                 />
                 <input
                   value={field.urlParam}
                   onChange={(e) => updateField(field.id, { urlParam: e.target.value.trim() })}
                   placeholder="utm_campaign"
                   spellCheck={false}
-                  className={`${styles.leadFieldsInput} ${styles.leadFieldsInputMono}`}
+                  className={`${styles.input} ${styles.inputMono}`}
                 />
                 <button
                   className="btn btn-ghost btn-sm"
@@ -242,12 +224,12 @@ function TemplateCard({
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.625rem' }}>
+          <div className={styles.footer}>
             <button className="btn btn-ghost btn-sm" onClick={addField}>
               <Plus size={13} strokeWidth={2.25} /> Add field
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-              <span className={styles.leadFieldsStatus} aria-live="polite">
+            <div className={styles.footerRight}>
+              <span className={styles.status} aria-live="polite">
                 {status === 'saving' && (
                   <>
                     <Loader2 size={12} strokeWidth={2} className="animate-spin" /> Saving…

@@ -22,17 +22,16 @@ export default function SettingsPage() {
 
   const [templates, setTemplates] = useState<LeadFieldTemplate[]>([]);
   useEffect(() => {
-    if (!questionnaire?.project_id) return;
     const supabase = createClient();
+    // RLS filters to the current user's templates — they're global per user.
     supabase
       .from('lead_field_templates')
       .select('*')
-      .eq('project_id', questionnaire.project_id)
       .order('created_at', { ascending: true })
       .then(({ data }) => {
         setTemplates((data as LeadFieldTemplate[] | null) ?? []);
       });
-  }, [questionnaire?.project_id]);
+  }, []);
 
   const selectedTemplate = templates.find((t) => t.id === templateId) ?? null;
   const templateFields = selectedTemplate?.fields ?? [];
@@ -66,7 +65,7 @@ export default function SettingsPage() {
                 Lead field template
               </h3>
               <Link
-                href={`/dashboard/projects/${questionnaire.project_id}`}
+                href="/dashboard/lead-templates"
                 style={{ fontSize: '0.8125rem', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}
               >
                 Manage templates <ExternalLink size={12} strokeWidth={1.75} />

@@ -13,6 +13,7 @@ import {
   Settings,
   LogOut,
   FolderKanban,
+  Tag,
 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Project } from '@/lib/types';
@@ -203,6 +204,7 @@ export default function SidebarInner({
     {
       items: [
         { label: 'Projects', icon: <FolderKanban {...ip} />, path: '/dashboard/projects' },
+        { label: 'Lead templates', icon: <Tag {...ip} />, path: '/dashboard/lead-templates' },
         { label: 'Settings', icon: <Settings {...ip} />, path: '/dashboard/settings' },
       ],
     },

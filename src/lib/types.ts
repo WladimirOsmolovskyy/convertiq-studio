@@ -284,7 +284,7 @@ export interface LeadField {
 
 export interface LeadFieldTemplate {
   id: string;
-  project_id: string;
+  user_id: string;
   name: string;
   fields: LeadField[];
   created_at: string;

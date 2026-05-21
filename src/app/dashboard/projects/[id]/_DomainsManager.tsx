@@ -22,7 +22,6 @@ import type {
 } from '@/lib/types';
 import dashStyles from '../../dashboard.module.css';
 import styles from './detail.module.css';
-import LeadFieldTemplatesManager from './_LeadFieldTemplatesManager';
 
 const STATUS_LABEL: Record<DomainVerificationStatus, string> = {
   pending: 'Pending DNS',
@@ -256,7 +255,6 @@ export default function DomainsManager({
         </div>
       )}
 
-      <LeadFieldTemplatesManager projectId={project.id} />
     </div>
   );
 }
