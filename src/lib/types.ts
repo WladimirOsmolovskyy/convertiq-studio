@@ -274,6 +274,14 @@ export interface ProjectDomain {
 
 /* ─── Questionnaire ─────────────────────────────────────────────── */
 
+export interface LeadField {
+  id: string;
+  label: string;
+  /** URL query parameter name to capture (e.g. "utm_campaign"). Stored on
+   *  responses.metadata.lead_fields keyed by this value. */
+  urlParam: string;
+}
+
 export interface Questionnaire {
   id: string;
   user_id: string;
@@ -282,6 +290,7 @@ export interface Questionnaire {
   title: string;
   slug: string;
   is_published: boolean;
+  lead_fields: LeadField[];
   created_at: string;
   updated_at: string;
 }

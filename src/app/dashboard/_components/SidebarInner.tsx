@@ -132,6 +132,11 @@ export default function SidebarInner({
       match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/design/.test(p),
     },
     {
+      label: 'Settings',
+      path: qTab('settings'),
+      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/settings/.test(p),
+    },
+    {
       label: 'Preview',
       path: qTab('preview'),
       match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/preview/.test(p),

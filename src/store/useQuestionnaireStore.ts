@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Question, QuestionBranch, ScoringRule, ScoreResult, DesignConfig, Questionnaire } from '@/lib/types';
+import type { Question, QuestionBranch, ScoringRule, ScoreResult, DesignConfig, Questionnaire, LeadField } from '@/lib/types';
 import { defaultDesign } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 
@@ -41,6 +41,9 @@ interface QuestionnaireState {
   updateSlug: (slug: string) => void;
   setDomain: (domainId: string | null) => void;
   togglePublished: () => void;
+  addLeadField: () => void;
+  updateLeadField: (id: string, updates: Partial<LeadField>) => void;
+  removeLeadField: (id: string) => void;
   hydrate: (data: {
     questionnaire: Questionnaire;
     questions: Question[];
@@ -235,6 +238,41 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
     if (q) set({ questionnaire: { ...q, is_published: !q.is_published }, isDirty: true });
   },
 
+  addLeadField: () => {
+    const q = get().questionnaire;
+    if (!q) return;
+    const newField: LeadField = {
+      id: crypto.randomUUID(),
+      label: 'New field',
+      urlParam: '',
+    };
+    set({
+      questionnaire: { ...q, lead_fields: [...(q.lead_fields || []), newField] },
+      isDirty: true,
+    });
+  },
+
+  updateLeadField: (id, updates) => {
+    const q = get().questionnaire;
+    if (!q) return;
+    set({
+      questionnaire: {
+        ...q,
+        lead_fields: (q.lead_fields || []).map((f) => (f.id === id ? { ...f, ...updates } : f)),
+      },
+      isDirty: true,
+    });
+  },
+
+  removeLeadField: (id) => {
+    const q = get().questionnaire;
+    if (!q) return;
+    set({
+      questionnaire: { ...q, lead_fields: (q.lead_fields || []).filter((f) => f.id !== id) },
+      isDirty: true,
+    });
+  },
+
   hydrate: (data) => set({ ...data, isDirty: false, isSaving: false, saveStatus: 'idle' }),
 
   reset: () =>
@@ -258,6 +296,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
           slug: s.questionnaire.slug,
           domain_id: s.questionnaire.domain_id,
           is_published: s.questionnaire.is_published,
+          lead_fields: s.questionnaire.lead_fields ?? [],
           updated_at: new Date().toISOString(),
         })
         .eq('id', qId);

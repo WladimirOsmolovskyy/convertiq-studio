@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { Question, QuestionBranch, ScoringRule, ScoreResult, DesignConfig, Questionnaire } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { nanoid } from 'nanoid';
@@ -25,6 +25,21 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
   const [sessionId] = useState(() => nanoid());
   const [submitting, setSubmitting] = useState(false);
   const [rating, setRating] = useState(0);
+  const [capturedFields, setCapturedFields] = useState<Record<string, string>>({});
+
+  // Capture URL query params for configured lead_fields on mount.
+  useEffect(() => {
+    const fields = questionnaire.lead_fields ?? [];
+    if (fields.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const captured: Record<string, string> = {};
+    for (const f of fields) {
+      if (!f.urlParam) continue;
+      const v = params.get(f.urlParam);
+      if (v) captured[f.urlParam] = v;
+    }
+    setCapturedFields(captured);
+  }, [questionnaire.lead_fields]);
 
   const currentQuestion = questions[currentIndex];
   const progress = questions.length > 0 ? ((questionPath.length) / questions.length) * 100 : 0;
@@ -147,6 +162,7 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
         metadata: {
           user_agent: navigator.userAgent,
           host: window.location.hostname,
+          lead_fields: capturedFields,
         },
       });
 
