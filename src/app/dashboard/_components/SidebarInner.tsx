@@ -196,13 +196,9 @@ export default function SidebarInner({
       ],
     },
     {
-      title: 'Activity',
+      title: 'Global',
       items: [
         { label: 'Import Docs', icon: <BookOpen {...ip} />, path: '/docs' },
-      ],
-    },
-    {
-      items: [
         { label: 'Projects', icon: <FolderKanban {...ip} />, path: '/dashboard/projects' },
         { label: 'Lead templates', icon: <Tag {...ip} />, path: '/dashboard/lead-templates' },
         { label: 'Settings', icon: <Settings {...ip} />, path: '/dashboard/settings' },
