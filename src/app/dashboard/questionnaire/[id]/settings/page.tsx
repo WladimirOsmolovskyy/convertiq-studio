@@ -12,6 +12,7 @@ import styles from '../editor.module.css';
 export default function SettingsPage() {
   const {
     questionnaire,
+    questions,
     addLeadField,
     updateLeadField,
     removeLeadField,
@@ -36,11 +37,11 @@ export default function SettingsPage() {
   const selectedTemplate = templates.find((t) => t.id === templateId) ?? null;
   const templateFields = selectedTemplate?.fields ?? [];
 
-  // Effective set drives the example URL — all params we'd capture in practice.
+  // Effective set drives the example URL — only URL fields contribute query params.
   const effective = resolveLeadFields(templateFields, fields);
   const exampleParams = effective
-    .filter((f) => f.urlParam.trim().length > 0)
-    .map((f) => `${encodeURIComponent(f.urlParam)}=value`)
+    .filter((f) => (f.kind ?? 'url') === 'url' && (f.urlParam ?? '').trim().length > 0)
+    .map((f) => `${encodeURIComponent(f.urlParam!)}=value`)
     .join('&');
   const exampleUrl = `https://yourdomain.com/${questionnaire?.slug ?? 'your-quiz'}${
     exampleParams ? `?${exampleParams}` : ''
@@ -134,12 +135,9 @@ export default function SettingsPage() {
             </button>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', marginBottom: '1rem', lineHeight: 1.5 }}>
-            Captured silently from URL query parameters when a visitor lands on the
-            published page. Useful for tracking tags
-            (<code>utm_campaign</code>, <code>utm_source</code>) or pre-filled lead data
-            (<code>name</code>, <code>email</code>). Adding a field here applies only to
-            this questionnaire; a field with the same URL parameter as a template field
-            overrides the template&apos;s label.
+            Each field has a source — either a URL query parameter (captured silently on
+            page load, useful for tracking tags) or a question in this questionnaire
+            (captured from the visitor&apos;s answer). Both end up on the lead.
           </p>
 
           {fields.length === 0 ? (
@@ -153,81 +151,117 @@ export default function SettingsPage() {
                 textAlign: 'center',
               }}
             >
-              No custom fields yet. Click <b>Add field</b> to capture URL parameters as lead data.
+              No custom fields yet. Click <b>Add field</b> to capture data as part of each lead.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr 36px',
-                  gap: '0.5rem',
-                  padding: '0 0.625rem',
-                  fontSize: '0.6875rem',
-                  fontWeight: 600,
-                  letterSpacing: '0.04em',
-                  textTransform: 'uppercase',
-                  color: 'var(--text-secondary)',
-                }}
-              >
-                <span>Label</span>
-                <span>URL parameter</span>
-                <span></span>
-              </div>
-              {fields.map((field) => (
-                <div
-                  key={field.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr 36px',
-                    gap: '0.5rem',
-                    alignItems: 'center',
-                    background: 'var(--surface)',
-                    border: '1px solid var(--separator)',
-                    borderRadius: 'var(--radius-xl)',
-                    padding: '0.625rem',
-                  }}
-                >
-                  <input
-                    value={field.label}
-                    onChange={(e) => updateLeadField(field.id, { label: e.target.value })}
-                    placeholder="Display label"
+              {fields.map((field) => {
+                const kind = field.kind ?? 'url';
+                return (
+                  <div
+                    key={field.id}
                     style={{
-                      padding: '0.4rem 0.55rem',
-                      border: '1px solid var(--separator)',
-                      borderRadius: 'var(--radius-md)',
+                      display: 'grid',
+                      gridTemplateColumns: '120px 1fr 1.4fr 36px',
+                      gap: '0.5rem',
+                      alignItems: 'center',
                       background: 'var(--surface)',
-                      font: 'inherit',
-                      fontSize: '0.8125rem',
-                      color: 'var(--text)',
-                    }}
-                  />
-                  <input
-                    value={field.urlParam}
-                    onChange={(e) => updateLeadField(field.id, { urlParam: e.target.value.trim() })}
-                    placeholder="utm_campaign"
-                    spellCheck={false}
-                    style={{
-                      padding: '0.4rem 0.55rem',
                       border: '1px solid var(--separator)',
-                      borderRadius: 'var(--radius-md)',
-                      background: 'var(--surface)',
-                      font: 'inherit',
-                      fontSize: '0.8125rem',
-                      color: 'var(--text)',
-                      fontFamily: "ui-monospace, 'SF Mono', monospace",
+                      borderRadius: 'var(--radius-xl)',
+                      padding: '0.625rem',
                     }}
-                  />
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => removeLeadField(field.id)}
-                    aria-label="Remove field"
-                    style={{ padding: '0.4rem', justifyContent: 'center' }}
                   >
-                    <Trash2 size={14} strokeWidth={1.75} />
-                  </button>
-                </div>
-              ))}
+                    <select
+                      value={kind}
+                      onChange={(e) => {
+                        const next = e.target.value as 'url' | 'question';
+                        if (next === 'url') {
+                          updateLeadField(field.id, { kind: 'url', questionId: undefined });
+                        } else {
+                          updateLeadField(field.id, { kind: 'question', urlParam: undefined });
+                        }
+                      }}
+                      style={{
+                        padding: '0.4rem 0.55rem',
+                        border: '1px solid var(--separator)',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--surface)',
+                        font: 'inherit',
+                        fontSize: '0.8125rem',
+                        color: 'var(--text)',
+                      }}
+                    >
+                      <option value="url">URL param</option>
+                      <option value="question">Question</option>
+                    </select>
+                    <input
+                      value={field.label}
+                      onChange={(e) => updateLeadField(field.id, { label: e.target.value })}
+                      placeholder="Display label"
+                      style={{
+                        padding: '0.4rem 0.55rem',
+                        border: '1px solid var(--separator)',
+                        borderRadius: 'var(--radius-md)',
+                        background: 'var(--surface)',
+                        font: 'inherit',
+                        fontSize: '0.8125rem',
+                        color: 'var(--text)',
+                      }}
+                    />
+                    {kind === 'url' ? (
+                      <input
+                        value={field.urlParam ?? ''}
+                        onChange={(e) =>
+                          updateLeadField(field.id, { urlParam: e.target.value.trim() })
+                        }
+                        placeholder="utm_campaign"
+                        spellCheck={false}
+                        style={{
+                          padding: '0.4rem 0.55rem',
+                          border: '1px solid var(--separator)',
+                          borderRadius: 'var(--radius-md)',
+                          background: 'var(--surface)',
+                          font: 'inherit',
+                          fontSize: '0.8125rem',
+                          color: 'var(--text)',
+                          fontFamily: "ui-monospace, 'SF Mono', monospace",
+                        }}
+                      />
+                    ) : (
+                      <select
+                        value={field.questionId ?? ''}
+                        onChange={(e) =>
+                          updateLeadField(field.id, { questionId: e.target.value || undefined })
+                        }
+                        style={{
+                          padding: '0.4rem 0.55rem',
+                          border: '1px solid var(--separator)',
+                          borderRadius: 'var(--radius-md)',
+                          background: 'var(--surface)',
+                          font: 'inherit',
+                          fontSize: '0.8125rem',
+                          color: 'var(--text)',
+                        }}
+                      >
+                        <option value="">Pick a question…</option>
+                        {questions.map((q) => (
+                          <option key={q.id} value={q.id}>
+                            {q.title || `Untitled (${q.type})`}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => removeLeadField(field.id)}
+                      aria-label="Remove field"
+                      style={{ padding: '0.4rem', justifyContent: 'center' }}
+                    >
+                      <Trash2 size={14} strokeWidth={1.75} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
 

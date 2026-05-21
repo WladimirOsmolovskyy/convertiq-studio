@@ -134,14 +134,42 @@ export default function LeadDetailPage({
     );
   }
 
-  const emailQ = questions.find((q) => q.type === 'email');
-  const nameQ =
-    questions.find(
-      (q) => (q.type === 'text' || q.type === 'textarea') && /name/i.test(q.title),
-    ) || questions.find((q) => q.type === 'text');
+  const capturedFieldsRaw =
+    typeof lead.metadata === 'object' && lead.metadata
+      ? ((lead.metadata as Record<string, unknown>).lead_fields as Record<string, string> | undefined)
+      : undefined;
 
-  const email = emailQ ? answers.find((a) => a.question_id === emailQ.id)?.answer?.value : null;
-  const name = nameQ ? answers.find((a) => a.question_id === nameQ.id)?.answer?.value : null;
+  // Prefer explicit field configuration (question-bound or URL) when present.
+  // Falls back to a simple heuristic for legacy leads collected before fields existed.
+  const findFieldByLabel = (re: RegExp) =>
+    leadFieldDefs.find((f) => re.test(f.label || ''));
+  const nameFieldDef = findFieldByLabel(/^name\b|first ?name|full ?name/i);
+  const emailFieldDef = findFieldByLabel(/^email\b|e-?mail/i);
+
+  const valueFromField = (f: typeof leadFieldDefs[number] | undefined): string | null => {
+    if (!f) return null;
+    const stored = capturedFieldsRaw?.[f.id];
+    if (stored) return stored;
+    if (f.kind === 'question' && f.questionId) {
+      return answers.find((a) => a.question_id === f.questionId)?.answer?.value ?? null;
+    }
+    return null;
+  };
+
+  let name = valueFromField(nameFieldDef);
+  let email = valueFromField(emailFieldDef);
+
+  if (!name) {
+    const nameQ =
+      questions.find(
+        (q) => (q.type === 'text' || q.type === 'textarea') && /name/i.test(q.title),
+      ) || questions.find((q) => q.type === 'text');
+    if (nameQ) name = answers.find((a) => a.question_id === nameQ.id)?.answer?.value ?? null;
+  }
+  if (!email) {
+    const emailQ = questions.find((q) => q.type === 'email');
+    if (emailQ) email = answers.find((a) => a.question_id === emailQ.id)?.answer?.value ?? null;
+  }
 
   const formatDate = (d: string | null) =>
     d
@@ -174,11 +202,19 @@ export default function LeadDetailPage({
   const userAgent = typeof lead.metadata === 'object' && lead.metadata
     ? (lead.metadata as Record<string, unknown>).user_agent
     : null;
-  const capturedFields =
-    typeof lead.metadata === 'object' && lead.metadata
-      ? ((lead.metadata as Record<string, unknown>).lead_fields as Record<string, string> | undefined)
-      : undefined;
+  const capturedFields = capturedFieldsRaw;
   const capturedEntries = capturedFields ? Object.entries(capturedFields) : [];
+  // Resolve each effective field's display value: prefer stored value by id,
+  // fall back to legacy storage keyed by urlParam, fall back to question answer
+  // for question-bound fields collected after the schema change.
+  const resolveDisplayValue = (f: typeof leadFieldDefs[number]): string | undefined => {
+    if (capturedFields?.[f.id]) return capturedFields[f.id];
+    if (f.urlParam && capturedFields?.[f.urlParam]) return capturedFields[f.urlParam];
+    if (f.kind === 'question' && f.questionId) {
+      return answers.find((a) => a.question_id === f.questionId)?.answer?.value;
+    }
+    return undefined;
+  };
 
   return (
     <div className={styles.body}>
@@ -240,9 +276,9 @@ export default function LeadDetailPage({
           <div className={styles.metaGrid}>
             {(leadFieldDefs.length > 0
               ? leadFieldDefs.map((f) => ({
-                  key: f.urlParam,
-                  label: f.label || f.urlParam,
-                  value: capturedFields?.[f.urlParam],
+                  key: f.id,
+                  label: f.label || f.urlParam || f.id,
+                  value: resolveDisplayValue(f),
                 }))
               : capturedEntries.map(([k, v]) => ({ key: k, label: k, value: v }))
             ).map((row) => (

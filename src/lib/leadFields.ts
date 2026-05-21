@@ -1,23 +1,50 @@
 import type { LeadField } from '@/lib/types';
 
 /**
- * Merge project-level and questionnaire-level lead fields into one effective
- * list. Deduplicated by urlParam (case-insensitive). Questionnaire-level
- * entries override project-level entries with the same urlParam — that way a
- * questionnaire can refine the label for a globally-defined param.
+ * Merge template fields with per-questionnaire fields into one effective list.
+ *
+ * Dedup rules:
+ *  - URL fields are deduplicated by `urlParam` (case-insensitive). A
+ *    questionnaire-level URL field with the same param as a template field
+ *    overrides the template's entry (lets a questionnaire refine the label).
+ *  - Question fields only exist at the questionnaire level. They're added
+ *    after URL fields, in declaration order.
+ *  - Anything without a kind is treated as `url` for backward compatibility.
  */
 export function resolveLeadFields(
-  projectFields: LeadField[] | null | undefined,
+  templateFields: LeadField[] | null | undefined,
   questionnaireFields: LeadField[] | null | undefined,
 ): LeadField[] {
-  const byParam = new Map<string, LeadField>();
-  for (const f of projectFields ?? []) {
-    if (!f.urlParam) continue;
-    byParam.set(f.urlParam.toLowerCase(), f);
+  const urlByParam = new Map<string, LeadField>();
+  const questionFields: LeadField[] = [];
+
+  const addUrl = (f: LeadField) => {
+    if (!f.urlParam) return;
+    urlByParam.set(f.urlParam.toLowerCase(), f);
+  };
+
+  for (const f of templateFields ?? []) {
+    // Templates only carry URL-kind fields by design.
+    if ((f.kind ?? 'url') === 'url') addUrl(f);
   }
   for (const f of questionnaireFields ?? []) {
-    if (!f.urlParam) continue;
-    byParam.set(f.urlParam.toLowerCase(), f);
+    const kind = f.kind ?? 'url';
+    if (kind === 'url') {
+      addUrl(f);
+    } else if (kind === 'question') {
+      if (f.questionId) questionFields.push(f);
+    }
   }
-  return Array.from(byParam.values());
+
+  return [...urlByParam.values(), ...questionFields];
+}
+
+/** True for fields that get their value from the URL on page load. */
+export function isUrlField(f: LeadField): boolean {
+  return (f.kind ?? 'url') === 'url';
+}
+
+/** True for fields bound to a questionnaire question's answer. */
+export function isQuestionField(f: LeadField): boolean {
+  return f.kind === 'question' && !!f.questionId;
 }

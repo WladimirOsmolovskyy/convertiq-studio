@@ -245,6 +245,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
     const newField: LeadField = {
       id: crypto.randomUUID(),
       label: 'New field',
+      kind: 'url',
       urlParam: '',
     };
     set({

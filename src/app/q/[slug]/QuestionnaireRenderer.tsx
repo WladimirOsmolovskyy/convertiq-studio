@@ -29,17 +29,17 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
   const [rating, setRating] = useState(0);
   const [capturedFields, setCapturedFields] = useState<Record<string, string>>({});
 
-  // Capture URL query params for the effective set of lead fields (template
-  // fields + questionnaire-specific) on mount.
+  // Capture URL query params for the effective URL-kind fields on mount.
+  // Question-kind fields are resolved later, at submit time.
   useEffect(() => {
     const fields = resolveLeadFields(templateLeadFields, questionnaire.lead_fields);
     if (fields.length === 0) return;
     const params = new URLSearchParams(window.location.search);
     const captured: Record<string, string> = {};
     for (const f of fields) {
-      if (!f.urlParam) continue;
+      if ((f.kind ?? 'url') !== 'url' || !f.urlParam) continue;
       const v = params.get(f.urlParam);
-      if (v) captured[f.urlParam] = v;
+      if (v) captured[f.id] = v;
     }
     setCapturedFields(captured);
   }, [templateLeadFields, questionnaire.lead_fields]);
@@ -148,6 +148,22 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
     const matched = scoreResults.find((r) => score >= r.min_score && score <= r.max_score);
     setMatchedResult(matched || null);
 
+    // Resolve question-bound lead fields from the answers we collected.
+    // URL fields were already captured into capturedFields on mount.
+    const effectiveFields = resolveLeadFields(templateLeadFields, questionnaire.lead_fields);
+    const leadFieldValues: Record<string, string> = { ...capturedFields };
+    for (const f of effectiveFields) {
+      if (f.kind !== 'question' || !f.questionId) continue;
+      const ans = answers[f.questionId];
+      if (!ans) continue;
+      const value =
+        ans.value ??
+        (ans.selected_options && ans.selected_options.length > 0
+          ? ans.selected_options.join(', ')
+          : null);
+      if (value) leadFieldValues[f.id] = value;
+    }
+
     // Save response to Supabase. We generate the response id client-side so the
     // insert+answers chain doesn't depend on reading the row back — the SELECT RLS
     // policy on `responses` requires `auth.uid()` to be the questionnaire owner,
@@ -165,7 +181,7 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
         metadata: {
           user_agent: navigator.userAgent,
           host: window.location.hostname,
-          lead_fields: capturedFields,
+          lead_fields: leadFieldValues,
         },
       });
 

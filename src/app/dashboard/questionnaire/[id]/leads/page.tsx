@@ -4,7 +4,7 @@ import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Users } from 'lucide-react';
-import type { Question } from '@/lib/types';
+import type { Question, LeadField } from '@/lib/types';
 import styles from './leads.module.css';
 
 type ResponseRow = {
@@ -15,6 +15,10 @@ type ResponseRow = {
   completed_at: string | null;
   metadata: Record<string, unknown> | null;
 };
+
+function pickFieldByLabel(fields: LeadField[], re: RegExp): LeadField | undefined {
+  return fields.find((f) => re.test(f.label || ''));
+}
 
 type AnswerRow = {
   response_id: string;
@@ -32,24 +36,6 @@ type Lead = {
   durationMs: number | null;
 };
 
-function pickLeadFields(
-  responseId: string,
-  answers: AnswerRow[],
-  nameQuestionId: string | null,
-  emailQuestionId: string | null,
-): { name: string | null; email: string | null } {
-  let name: string | null = null;
-  let email: string | null = null;
-  for (const a of answers) {
-    if (a.response_id !== responseId) continue;
-    const value = a.answer?.value ?? null;
-    if (!value) continue;
-    if (nameQuestionId && a.question_id === nameQuestionId && !name) name = value;
-    if (emailQuestionId && a.question_id === emailQuestionId && !email) email = value;
-  }
-  return { name, email };
-}
-
 export default function LeadsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -60,15 +46,34 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
     const load = async () => {
       const supabase = createClient();
 
-      const questionsRes = await supabase
-        .from('questions')
-        .select('id, type, title, sort_order')
-        .eq('questionnaire_id', id)
-        .order('sort_order');
+      const [questionsRes, qRes] = await Promise.all([
+        supabase
+          .from('questions')
+          .select('id, type, title, sort_order')
+          .eq('questionnaire_id', id)
+          .order('sort_order'),
+        supabase
+          .from('questionnaires')
+          .select('lead_fields, template:lead_field_templates(fields)')
+          .eq('id', id)
+          .maybeSingle(),
+      ]);
       const questions = (questionsRes.data || []) as Pick<Question, 'id' | 'type' | 'title'>[];
 
-      const emailQ = questions.find((q) => q.type === 'email');
-      const nameQ =
+      const templateFields = (() => {
+        const p = qRes.data?.template as unknown;
+        if (Array.isArray(p)) return (p[0] as { fields?: LeadField[] } | undefined)?.fields ?? [];
+        return (p as { fields?: LeadField[] } | null | undefined)?.fields ?? [];
+      })();
+      const qFields = (qRes.data?.lead_fields as LeadField[] | undefined) ?? [];
+      const effectiveFields = [...templateFields, ...qFields];
+
+      const nameField = pickFieldByLabel(effectiveFields, /^name\b|first ?name|full ?name/i);
+      const emailField = pickFieldByLabel(effectiveFields, /^email\b|e-?mail/i);
+
+      // Heuristic fallback to legacy behavior when no configured fields match.
+      const fallbackEmailQ = questions.find((q) => q.type === 'email');
+      const fallbackNameQ =
         questions.find(
           (q) => (q.type === 'text' || q.type === 'textarea') && /name/i.test(q.title),
         ) || questions.find((q) => q.type === 'text');
@@ -92,16 +97,44 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
         answers = (answersRes.data || []) as AnswerRow[];
       }
 
+      const resolveFromConfig = (
+        responseMeta: Record<string, unknown> | null,
+        responseId: string,
+        field: LeadField | undefined,
+      ): string | null => {
+        if (!field) return null;
+        const stored = (responseMeta?.lead_fields as Record<string, string> | undefined)?.[field.id];
+        if (stored) return stored;
+        if (field.kind === 'question' && field.questionId) {
+          const a = answers.find(
+            (x) => x.response_id === responseId && x.question_id === field.questionId,
+          );
+          return a?.answer?.value ?? null;
+        }
+        if (field.urlParam) {
+          const legacy = (responseMeta?.lead_fields as Record<string, string> | undefined)?.[field.urlParam];
+          return legacy ?? null;
+        }
+        return null;
+      };
+
       const mapped: Lead[] = responses.map((r) => {
-        const fields = pickLeadFields(r.id, answers, nameQ?.id ?? null, emailQ?.id ?? null);
+        let name = resolveFromConfig(r.metadata, r.id, nameField);
+        let email = resolveFromConfig(r.metadata, r.id, emailField);
+        if (!name && fallbackNameQ) {
+          name = answers.find((a) => a.response_id === r.id && a.question_id === fallbackNameQ.id)?.answer?.value ?? null;
+        }
+        if (!email && fallbackEmailQ) {
+          email = answers.find((a) => a.response_id === r.id && a.question_id === fallbackEmailQ.id)?.answer?.value ?? null;
+        }
         const durationMs =
           r.completed_at && r.started_at
             ? new Date(r.completed_at).getTime() - new Date(r.started_at).getTime()
             : null;
         return {
           id: r.id,
-          name: fields.name,
-          email: fields.email,
+          name,
+          email,
           score: r.total_score,
           started_at: r.started_at,
           completed_at: r.completed_at,

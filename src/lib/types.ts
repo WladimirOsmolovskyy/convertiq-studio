@@ -274,12 +274,24 @@ export interface ProjectDomain {
 
 /* ─── Questionnaire ─────────────────────────────────────────────── */
 
+/** Where a lead field gets its value from.
+ *  - `url`: capture a URL query parameter on page load (works on templates +
+ *    per-questionnaire fields).
+ *  - `question`: bind to a specific question's answer; resolved at submit
+ *    time. Only valid on per-questionnaire fields — templates can't reference
+ *    question ids that don't exist in their context.
+ */
+export type LeadFieldKind = 'url' | 'question';
+
 export interface LeadField {
   id: string;
   label: string;
-  /** URL query parameter name to capture (e.g. "utm_campaign"). Stored on
-   *  responses.metadata.lead_fields keyed by this value. */
-  urlParam: string;
+  /** Defaults to 'url' when absent for backward compatibility with pre-kind fields. */
+  kind?: LeadFieldKind;
+  /** URL query parameter name to capture, e.g. "utm_campaign". Used when kind='url'. */
+  urlParam?: string;
+  /** Source question id. Used when kind='question'. */
+  questionId?: string;
 }
 
 export interface LeadFieldTemplate {
