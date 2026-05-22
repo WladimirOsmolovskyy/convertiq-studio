@@ -1,12 +1,39 @@
 import { NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getUserApiKey } from '@/lib/userApiKeys';
 
 export async function POST(request: Request) {
   try {
-    const { answer, prompt, min_score, max_score } = await request.json();
+    const { questionnaire_id, answer, prompt, min_score, max_score } = await request.json();
 
-    const apiKey = process.env.OPENAI_API_KEY;
+    if (typeof questionnaire_id !== 'string' || !questionnaire_id) {
+      return NextResponse.json({ error: 'questionnaire_id required' }, { status: 400 });
+    }
+
+    // Resolve the questionnaire's owner so we can use their OpenAI key.
+    // Anonymous public responders hit this endpoint, so we read with service role.
+    const admin = createAdminClient();
+    const { data: q, error: qErr } = await admin
+      .from('questionnaires')
+      .select('project_id, projects(user_id)')
+      .eq('id', questionnaire_id)
+      .maybeSingle();
+    if (qErr || !q) {
+      return NextResponse.json({ error: 'Questionnaire not found' }, { status: 404 });
+    }
+
+    const joined = (q as { projects: { user_id: string } | { user_id: string }[] | null }).projects;
+    const ownerId = Array.isArray(joined) ? joined[0]?.user_id : joined?.user_id;
+    if (!ownerId) {
+      return NextResponse.json({ error: 'Questionnaire owner not found' }, { status: 404 });
+    }
+
+    const apiKey = await getUserApiKey(admin, ownerId, 'openai');
     if (!apiKey) {
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'OpenAI API key not configured. Set it in dashboard Settings.' },
+        { status: 400 }
+      );
     }
 
     const systemPrompt = `You are a scoring assistant. Evaluate the following answer and provide a score between ${min_score} and ${max_score}.
@@ -51,7 +78,7 @@ Respond ONLY with a JSON object in this exact format:
     } catch {
       return NextResponse.json({ error: 'Failed to parse AI response', raw: content }, { status: 500 });
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
