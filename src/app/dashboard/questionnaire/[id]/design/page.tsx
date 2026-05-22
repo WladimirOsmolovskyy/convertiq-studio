@@ -2,6 +2,7 @@
 
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import styles from '../editor.module.css';
+import PreviewRenderer from '../PreviewRenderer';
 
 /* ── Font Registry with available weights ─────────────────────── */
 interface FontDef {
@@ -233,16 +234,11 @@ function FontPanel({
 
 /* ── Main Component ────────────────────────────────────────────── */
 export default function DesignEditor() {
-  const { design, updateDesign, questions } = useQuestionnaireStore();
+  const store = useQuestionnaireStore();
+  const { design, updateDesign } = store;
 
   const body = getBody(design);
   const heading = getHeading(design);
-
-  const getBackgroundCSS = () => {
-    if (design.background.type === 'gradient') return design.background.value;
-    if (design.background.type === 'image') return `url(${design.background.value}) center/cover no-repeat`;
-    return design.colors.background;
-  };
 
   const syncColorsToComponents = (colors: typeof design.colors) => {
     const bg = colors.background;
@@ -320,13 +316,6 @@ export default function DesignEditor() {
       },
     });
   };
-
-  const sampleQuestions = questions.length > 0
-    ? questions.slice(0, 2)
-    : [
-        { id: '1', title: 'How satisfied are you with our service?', type: 'radio', description: 'Select the option that best matches your experience.', options: [{ id: 'a', label: 'Very satisfied' }, { id: 'b', label: 'Satisfied' }, { id: 'c', label: 'Neutral' }] },
-        { id: '2', title: 'Any additional feedback?', type: 'text', description: '', options: [] },
-      ];
 
   return (
     <div className={styles.editorBody} style={{ display: 'flex', overflow: 'hidden' }}>
@@ -470,128 +459,22 @@ export default function DesignEditor() {
         </div>
       </div>
 
-      {/* ─── Live Preview ────────────────────────────────────── */}
-      <div style={{ flex: 1, background: getBackgroundCSS(), padding: '2rem', overflow: 'auto' }}>
-        <div style={{
-          maxWidth: `${design.layout.maxWidth}px`,
-          margin: '0 auto',
-          fontFamily: design.typography.fontFamily,
-          fontSize: `${body.size}px`,
-          fontWeight: body.weight,
-          lineHeight: body.lineHeight,
-          letterSpacing: `${body.letterSpacing}em`,
-          color: body.color,
-        }}>
-          {/* Progress bar */}
-          <div style={{
-            height: `${design.components.progress.height}px`,
-            background: design.components.progress.background,
-            borderRadius: '9999px', overflow: 'hidden',
-            marginBottom: `${design.layout.spacing}rem`,
-          }}>
-            <div style={{ width: '45%', height: '100%', background: design.components.progress.fillColor, borderRadius: '9999px', transition: 'width 0.3s' }} />
+      {/* ─── Live Preview — same renderer as /preview ─────────── */}
+      <div style={{ flex: 1, overflow: 'auto' }}>
+        {store.questionnaire ? (
+          <PreviewRenderer
+            questionnaire={store.questionnaire}
+            questions={store.questions}
+            branches={store.branches}
+            scoringRules={store.scoringRules}
+            scoreResults={store.scoreResults}
+            design={store.design}
+          />
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+            <p>Loading questionnaire...</p>
           </div>
-
-          {/* Question cards */}
-          {sampleQuestions.map((q: any) => (
-            <div key={q.id} style={{
-              background: design.components.question.background,
-              border: design.components.question.border,
-              boxShadow: design.components.question.shadow,
-              padding: design.components.question.padding,
-              borderRadius: `${design.layout.borderRadius}px`,
-              marginBottom: `${design.layout.questionSpacing}rem`,
-            }}>
-              <h3 style={{
-                fontFamily: design.typography.headingFont,
-                fontWeight: heading.weight,
-                fontSize: `${heading.size}px`,
-                lineHeight: heading.lineHeight,
-                letterSpacing: `${heading.letterSpacing}em`,
-                color: heading.color,
-                marginBottom: q.description ? '0.25rem' : '1rem',
-              }}>
-                {q.title}
-              </h3>
-
-              {q.description && (
-                <p style={{
-                  fontSize: `${body.size * 0.875}px`,
-                  color: design.colors.textMuted,
-                  marginBottom: '1rem',
-                  fontWeight: body.weight,
-                  lineHeight: body.lineHeight,
-                  letterSpacing: `${body.letterSpacing}em`,
-                }}>
-                  {q.description}
-                </p>
-              )}
-
-              {/* Radio options */}
-              {q.options.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {q.options.map((opt: any, i: number) => (
-                    <div key={opt.id} style={{
-                      padding: '0.75rem 1rem',
-                      background: i === 0 ? design.components.option.selectedBackground : design.components.option.background,
-                      border: i === 0 ? design.components.option.selectedBorder : design.components.option.border,
-                      borderRadius: `${design.layout.borderRadius * 0.6}px`,
-                      cursor: 'pointer',
-                      color: body.color,
-                      fontSize: `${body.size}px`,
-                      fontWeight: body.weight,
-                      letterSpacing: `${body.letterSpacing}em`,
-                      display: 'flex', alignItems: 'center', gap: '0.625rem',
-                    }}>
-                      <div style={{
-                        width: 16, height: 16, borderRadius: '50%',
-                        border: `2px solid ${i === 0 ? design.colors.primary : design.colors.textMuted}`,
-                        background: i === 0 ? design.colors.primary : 'transparent',
-                        flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        {i === 0 && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
-                      </div>
-                      {opt.label}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Text input */}
-              {q.type === 'text' && (
-                <div style={{
-                  padding: '0.75rem 1rem',
-                  background: design.components.input.background,
-                  border: design.components.input.border,
-                  borderRadius: `${design.components.input.borderRadius}px`,
-                  color: design.colors.textMuted,
-                  fontSize: `${body.size}px`,
-                  fontWeight: body.weight,
-                  letterSpacing: `${body.letterSpacing}em`,
-                }}>
-                  Type your answer here…
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* Button */}
-          <div style={{ textAlign: 'center', marginTop: `${design.layout.spacing}rem` }}>
-            <button style={{
-              background: design.components.button.background,
-              color: design.components.button.color,
-              border: 'none',
-              borderRadius: `${design.components.button.borderRadius}px`,
-              padding: design.components.button.padding,
-              fontSize: `${design.components.button.fontSize}px`,
-              fontWeight: 600, cursor: 'pointer',
-              fontFamily: design.typography.fontFamily,
-              transition: 'all 0.15s',
-            }}>
-              Next Question →
-            </button>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-.publishedPage {
+.page {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -7,7 +7,7 @@
   transition: background 0.3s;
 }
 
-.publishedContainer {
+.container {
   width: 100%;
   transition: max-width 0.3s;
 }
@@ -61,6 +61,25 @@
   gap: 0.5rem;
 }
 
+/* Radio questions render in a 2-column grid with auto-advancing tiles —
+   no indicator dot, label centered. Falls back to one column on narrow widths. */
+.optionsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+@media (max-width: 480px) {
+  .optionsGrid { grid-template-columns: 1fr; }
+}
+
+.optionRadio {
+  justify-content: center;
+  text-align: center;
+  min-height: 64px;
+  font-weight: 500;
+  padding: 1rem 1.125rem;
+}
+
 .optionButton {
   padding: 0.875rem 1.125rem;
   border: none;
@@ -98,7 +117,7 @@
 }
 
 /* ─── Input Fields ─────────────────────────────────────────────── */
-.publishedInput {
+.input {
   width: 100%;
   padding: 0.875rem 1rem;
   border: none;
@@ -106,11 +125,11 @@
   font-family: inherit;
   transition: border 0.15s, box-shadow 0.15s;
 }
-.publishedInput:focus {
+.input:focus {
   outline: none;
 }
 
-.publishedTextarea {
+.textarea {
   width: 100%;
   padding: 0.875rem 1rem;
   border: none;
@@ -120,7 +139,7 @@
   min-height: 120px;
   transition: border 0.15s, box-shadow 0.15s;
 }
-.publishedTextarea:focus {
+.textarea:focus {
   outline: none;
 }
 
