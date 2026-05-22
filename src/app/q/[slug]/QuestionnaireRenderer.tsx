@@ -97,28 +97,57 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
     return qIndex + 1 < questions.length ? qIndex + 1 : -1;
   }, [questions, branches]);
 
-  const calculateScore = useCallback(() => {
-    let score = 0;
-    for (const q of questions) {
-      const rule = scoringRules.find((r) => r.question_id === q.id);
-      if (!rule) continue;
-      const ans = answers[q.id];
-      if (!ans) continue;
+  type AnswersMap = Record<string, { value?: string; selected_options?: string[] }>;
 
-      if (rule.type === 'fixed' && hasOptions(q.type)) {
-        for (const optId of ans.selected_options || []) {
-          score += rule.option_scores?.[optId] ?? 0;
+  const calculateScore = useCallback(
+    (src: AnswersMap) => {
+      let score = 0;
+      for (const q of questions) {
+        const rule = scoringRules.find((r) => r.question_id === q.id);
+        if (!rule) continue;
+        const ans = src[q.id];
+        if (!ans) continue;
+
+        if (rule.type === 'fixed' && hasOptions(q.type)) {
+          for (const optId of ans.selected_options || []) {
+            score += rule.option_scores?.[optId] ?? 0;
+          }
+        } else if (rule.type === 'fixed') {
+          score += rule.option_scores?.['_any'] ?? 0;
         }
-      } else if (rule.type === 'fixed') {
-        score += rule.option_scores?.['_any'] ?? 0;
+        // AI scoring would be handled server-side
       }
-      // AI scoring would be handled server-side
-    }
-    return score;
-  }, [questions, scoringRules, answers]);
+      return score;
+    },
+    [questions, scoringRules],
+  );
 
   const handleAnswer = (questionId: string, answer: { value?: string; selected_options?: string[] }) => {
     setAnswers((prev) => ({ ...prev, [questionId]: answer }));
+  };
+
+  // Radio: select + auto-advance in one step. Computes the next index from a
+  // local `newAnswers` so we don't have to wait for React to flush.
+  const handleRadioSelect = async (optionId: string) => {
+    if (!currentQuestion || submitting) return;
+    const newAnswers: AnswersMap = {
+      ...answers,
+      [currentQuestion.id]: { selected_options: [optionId] },
+    };
+    setAnswers(newAnswers);
+
+    const nextIdx = getNextQuestionIndex(currentIndex, newAnswers);
+    const reachedEnd = nextIdx === -1 || nextIdx >= questions.length;
+    if (reachedEnd) {
+      if (customLeadFields.length > 0 && !showLeadCapture) {
+        setShowLeadCapture(true);
+        return;
+      }
+      await submitAndFinish(newAnswers);
+    } else {
+      setCurrentIndex(nextIdx);
+      setQuestionPath((prev) => [...prev, nextIdx]);
+    }
   };
 
   const handleOptionSelect = (optionId: string) => {
@@ -170,9 +199,12 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
     }
   };
 
-  const submitAndFinish = async () => {
+  // `finalAnswers` lets callers pass in a freshly-mutated answers map
+  // (auto-advance on radio updates state and then submits in the same tick,
+  // before React has flushed). Defaults to the current state.
+  const submitAndFinish = async (finalAnswers: AnswersMap = answers) => {
     setSubmitting(true);
-    const score = calculateScore();
+    const score = calculateScore(finalAnswers);
     setTotalScore(score);
 
     // Find matching result
@@ -190,7 +222,7 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
     }
     for (const f of effectiveLeadFields) {
       if (f.kind !== 'question' || !f.questionId) continue;
-      const ans = answers[f.questionId];
+      const ans = finalAnswers[f.questionId];
       if (!ans) continue;
       const value =
         ans.value ??
@@ -224,7 +256,7 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
         questionnaire,
         templateLeadFields,
         questions,
-        answers,
+        answers: finalAnswers,
         leadFieldValues,
         scoringRules,
       });
@@ -246,7 +278,7 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
       });
 
       if (!insertErr) {
-        const answerRows = Object.entries(answers).map(([questionId, ans]) => {
+        const answerRows = Object.entries(finalAnswers).map(([questionId, ans]) => {
           const rule = scoringRules.find((r) => r.question_id === questionId);
           let qScore = 0;
           const q = questions.find((qq) => qq.id === questionId);
@@ -439,14 +471,24 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
 
                 {/* Radio / Checkbox / Dropdown Options */}
                 {hasOptions(currentQuestion.type) && (
-                  <div className={styles.optionsList}>
+                  <div
+                    className={
+                      currentQuestion.type === 'radio'
+                        ? styles.optionsGrid
+                        : styles.optionsList
+                    }
+                  >
                     {currentQuestion.options.map((opt) => {
                       const isSelected = answers[currentQuestion.id]?.selected_options?.includes(opt.id);
+                      const isRadio = currentQuestion.type === 'radio';
                       return (
                         <button
                           key={opt.id}
-                          className={`${styles.optionButton} ${isSelected ? styles.selected : ''}`}
-                          onClick={() => handleOptionSelect(opt.id)}
+                          className={`${styles.optionButton} ${isSelected ? styles.selected : ''} ${isRadio ? styles.optionRadio : ''}`}
+                          onClick={() =>
+                            isRadio ? handleRadioSelect(opt.id) : handleOptionSelect(opt.id)
+                          }
+                          disabled={isRadio && submitting}
                           style={{
                             background: isSelected ? design.components.option.selectedBackground : design.components.option.background,
                             border: isSelected ? design.components.option.selectedBorder : design.components.option.border,
@@ -454,7 +496,12 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
                             color: design.colors.text,
                           }}
                         >
-                          <div className={`${styles.optionIndicator} ${currentQuestion.type === 'checkbox' ? styles.checkbox : ''}`} style={{ color: design.colors.accent }} />
+                          {!isRadio && (
+                            <div
+                              className={`${styles.optionIndicator} ${currentQuestion.type === 'checkbox' ? styles.checkbox : ''}`}
+                              style={{ color: design.colors.accent }}
+                            />
+                          )}
                           {opt.label}
                         </button>
                       );
@@ -567,29 +614,34 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
               >
                 ← Back
               </button>
-              <button
-                className={styles.navBtn}
-                onClick={showLeadCapture ? handleLeadCaptureSubmit : handleNext}
-                disabled={(!showLeadCapture && !canProceed) || submitting}
-                style={{
-                  background: design.components.button.background,
-                  color: design.components.button.color,
-                  borderRadius: `${design.components.button.borderRadius}px`,
-                  padding: design.components.button.padding,
-                  fontSize: `${design.components.button.fontSize}px`,
-                  opacity: (!showLeadCapture && !canProceed) ? 0.5 : 1,
-                }}
-              >
-                {submitting
-                  ? 'Submitting...'
-                  : showLeadCapture
-                    ? 'Submit'
-                    : getNextQuestionIndex(currentIndex, answers) === -1
-                      ? customLeadFields.length > 0
-                        ? 'Continue'
-                        : 'Submit'
-                      : 'Next'}
-              </button>
+              {/* Radio questions auto-advance on click, so the Next button is
+                  redundant. Keep it for every other input type and during the
+                  lead-capture step. */}
+              {(showLeadCapture || currentQuestion?.type !== 'radio') && (
+                <button
+                  className={styles.navBtn}
+                  onClick={showLeadCapture ? handleLeadCaptureSubmit : handleNext}
+                  disabled={(!showLeadCapture && !canProceed) || submitting}
+                  style={{
+                    background: design.components.button.background,
+                    color: design.components.button.color,
+                    borderRadius: `${design.components.button.borderRadius}px`,
+                    padding: design.components.button.padding,
+                    fontSize: `${design.components.button.fontSize}px`,
+                    opacity: (!showLeadCapture && !canProceed) ? 0.5 : 1,
+                  }}
+                >
+                  {submitting
+                    ? 'Submitting...'
+                    : showLeadCapture
+                      ? 'Submit'
+                      : getNextQuestionIndex(currentIndex, answers) === -1
+                        ? customLeadFields.length > 0
+                          ? 'Continue'
+                          : 'Submit'
+                        : 'Next'}
+                </button>
+              )}
             </div>
           </>
         ) : (
