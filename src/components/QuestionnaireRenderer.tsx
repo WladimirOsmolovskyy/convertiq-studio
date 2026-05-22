@@ -8,8 +8,8 @@
  *   - dashboard preview tab (via QuestionnaireRendererPreview wrapper)
  *
  * Both wrappers pass their own CSS module (`styles`) plus a `mode` flag that
- * toggles preview-only chrome (banner, restart button) and the `is_preview`
- * metadata bit. The class names used inside this file must exist on every
+ * toggles preview-only chrome (banner, restart button); preview mode also
+ * skips persistence entirely. The class names used inside this file must exist on every
  * styles module passed in — `page`, `container`, `input`, `textarea`,
  * `progressWrap`, `progressBar`, `progressFill`, `progressLabel`,
  * `questionWrap`, `questionTitle`, `questionDescription`, `requiredStar`,
@@ -51,7 +51,7 @@ export interface QuestionnaireRendererProps {
   /** CSS module providing the class surface this component uses. */
   styles: StylesMap;
   /** 'public' (default) or 'preview'. Preview shows banner + restart UI and
-   *  flags saved responses with metadata.is_preview = true. */
+   *  does not persist responses. */
   mode?: 'public' | 'preview';
   /** Optional template-level lead fields. Public path loads them server-side
    *  and passes them in; preview omits them. */
@@ -293,70 +293,71 @@ export default function QuestionnaireRenderer({
       if (value) leadFieldValues[f.id] = value;
     }
 
-    try {
-      const supabase = createClient();
-      const responseId = crypto.randomUUID();
-      const completedAtIso = new Date().toISOString();
+    if (!isPreview) {
+      try {
+        const supabase = createClient();
+        const responseId = crypto.randomUUID();
+        const completedAtIso = new Date().toISOString();
 
-      const payload = buildLeadPayload({
-        responseId,
-        sessionId,
-        startedAt: completedAtIso,
-        completedAt: completedAtIso,
-        totalScore: score,
-        matchedResult: matched ?? null,
-        host: typeof window !== 'undefined' ? window.location.hostname : null,
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
-        questionnaire,
-        templateLeadFields,
-        questions,
-        answers: finalAnswers,
-        leadFieldValues,
-        scoringRules,
-      });
-
-      const { error: insertErr } = await supabase.from('responses').insert({
-        id: responseId,
-        questionnaire_id: questionnaire.id,
-        session_id: sessionId,
-        total_score: score,
-        result_id: matched?.id || null,
-        completed_at: completedAtIso,
-        metadata: {
-          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        const payload = buildLeadPayload({
+          responseId,
+          sessionId,
+          startedAt: completedAtIso,
+          completedAt: completedAtIso,
+          totalScore: score,
+          matchedResult: matched ?? null,
           host: typeof window !== 'undefined' ? window.location.hostname : null,
-          lead_fields: leadFieldValues,
-          webhook_payload: payload,
-          ...(isPreview ? { is_preview: true } : {}),
-        },
-      });
-
-      if (!insertErr) {
-        const answerRows = Object.entries(finalAnswers).map(([questionId, ans]) => {
-          const rule = scoringRules.find((r) => r.question_id === questionId);
-          let qScore = 0;
-          const q = questions.find((qq) => qq.id === questionId);
-          if (rule && q) {
-            if (rule.type === 'fixed' && hasOptions(q.type)) {
-              for (const optId of ans.selected_options || []) {
-                qScore += rule.option_scores?.[optId] ?? 0;
-              }
-            } else if (rule.type === 'fixed') {
-              qScore = rule.option_scores?.['_any'] ?? 0;
-            }
-          }
-          return {
-            response_id: responseId,
-            question_id: questionId,
-            answer: ans,
-            score: qScore,
-            answered_at: new Date().toISOString(),
-          };
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+          questionnaire,
+          templateLeadFields,
+          questions,
+          answers: finalAnswers,
+          leadFieldValues,
+          scoringRules,
         });
-        await supabase.from('response_answers').insert(answerRows);
+
+        const { error: insertErr } = await supabase.from('responses').insert({
+          id: responseId,
+          questionnaire_id: questionnaire.id,
+          session_id: sessionId,
+          total_score: score,
+          result_id: matched?.id || null,
+          completed_at: completedAtIso,
+          metadata: {
+            user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+            host: typeof window !== 'undefined' ? window.location.hostname : null,
+            lead_fields: leadFieldValues,
+            webhook_payload: payload,
+          },
+        });
+
+        if (!insertErr) {
+          const answerRows = Object.entries(finalAnswers).map(([questionId, ans]) => {
+            const rule = scoringRules.find((r) => r.question_id === questionId);
+            let qScore = 0;
+            const q = questions.find((qq) => qq.id === questionId);
+            if (rule && q) {
+              if (rule.type === 'fixed' && hasOptions(q.type)) {
+                for (const optId of ans.selected_options || []) {
+                  qScore += rule.option_scores?.[optId] ?? 0;
+                }
+              } else if (rule.type === 'fixed') {
+                qScore = rule.option_scores?.['_any'] ?? 0;
+              }
+            }
+            return {
+              response_id: responseId,
+              question_id: questionId,
+              answer: ans,
+              score: qScore,
+              answered_at: new Date().toISOString(),
+            };
+          });
+          await supabase.from('response_answers').insert(answerRows);
+        }
+      } catch (err) {
+        console.error('Failed to save response:', err);
       }
-    } catch (err) {
-      console.error('Failed to save response:', err);
     }
 
     setCompleted(true);
@@ -409,7 +410,7 @@ export default function QuestionnaireRenderer({
           <div className={styles.previewBannerInner}>
             <span className={styles.previewBadge}>👁 PREVIEW</span>
             <span className={styles.previewBannerText}>
-              Responses are saved — test your questionnaire end-to-end
+              Preview mode — responses are not saved
             </span>
             <button className={styles.previewRestartBtn} onClick={handleRestart}>
               ↻ Restart

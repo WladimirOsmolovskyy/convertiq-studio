@@ -2,7 +2,7 @@
 
 /**
  * Editor preview wrapper. Hands the shared renderer the preview CSS module and
- * sets mode='preview' (banner + restart UI + is_preview metadata bit).
+ * sets mode='preview' (banner + restart UI; responses are not persisted).
  */
 
 import QuestionnaireRenderer, {
