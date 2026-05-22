@@ -1,4 +1,4 @@
-.publishedPage {
+.page {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -7,7 +7,7 @@
   transition: background 0.3s;
 }
 
-.publishedContainer {
+.container {
   width: 100%;
   transition: max-width 0.3s;
 }
@@ -117,7 +117,7 @@
 }
 
 /* ─── Input Fields ─────────────────────────────────────────────── */
-.publishedInput {
+.input {
   width: 100%;
   padding: 0.875rem 1rem;
   border: none;
@@ -125,11 +125,11 @@
   font-family: inherit;
   transition: border 0.15s, box-shadow 0.15s;
 }
-.publishedInput:focus {
+.input:focus {
   outline: none;
 }
 
-.publishedTextarea {
+.textarea {
   width: 100%;
   padding: 0.875rem 1rem;
   border: none;
@@ -139,7 +139,7 @@
   min-height: 120px;
   transition: border 0.15s, box-shadow 0.15s;
 }
-.publishedTextarea:focus {
+.textarea:focus {
   outline: none;
 }
 

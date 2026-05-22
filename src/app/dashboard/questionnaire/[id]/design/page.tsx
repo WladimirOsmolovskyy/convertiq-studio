@@ -527,30 +527,35 @@ export default function DesignEditor() {
                 </p>
               )}
 
-              {/* Radio options */}
+              {/* Radio options — 2-col grid of clean tiles, no indicator dot. */}
               {q.options.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                    gap: '0.5rem',
+                  }}
+                >
                   {q.options.map((opt: any, i: number) => (
-                    <div key={opt.id} style={{
-                      padding: '0.75rem 1rem',
-                      background: i === 0 ? design.components.option.selectedBackground : design.components.option.background,
-                      border: i === 0 ? design.components.option.selectedBorder : design.components.option.border,
-                      borderRadius: `${design.layout.borderRadius * 0.6}px`,
-                      cursor: 'pointer',
-                      color: body.color,
-                      fontSize: `${body.size}px`,
-                      fontWeight: body.weight,
-                      letterSpacing: `${body.letterSpacing}em`,
-                      display: 'flex', alignItems: 'center', gap: '0.625rem',
-                    }}>
-                      <div style={{
-                        width: 16, height: 16, borderRadius: '50%',
-                        border: `2px solid ${i === 0 ? design.colors.primary : design.colors.textMuted}`,
-                        background: i === 0 ? design.colors.primary : 'transparent',
-                        flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        {i === 0 && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
-                      </div>
+                    <div
+                      key={opt.id}
+                      style={{
+                        padding: '1rem 1.125rem',
+                        minHeight: 64,
+                        background: i === 0 ? design.components.option.selectedBackground : design.components.option.background,
+                        border: i === 0 ? design.components.option.selectedBorder : design.components.option.border,
+                        borderRadius: `${design.layout.borderRadius * 0.6}px`,
+                        cursor: 'pointer',
+                        color: body.color,
+                        fontSize: `${body.size}px`,
+                        fontWeight: 500,
+                        letterSpacing: `${body.letterSpacing}em`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                      }}
+                    >
                       {opt.label}
                     </div>
                   ))}

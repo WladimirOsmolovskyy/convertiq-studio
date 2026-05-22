@@ -22,7 +22,6 @@ export default function PreviewPage() {
       scoringRules={store.scoringRules}
       scoreResults={store.scoreResults}
       design={store.design}
-      isPreview
     />
   );
 }
