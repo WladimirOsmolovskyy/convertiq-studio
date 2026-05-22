@@ -25,11 +25,38 @@ export default async function DashboardLayout({
   }
   const active = await getActiveProject(supabase, user.id);
 
+  const [questionnairesRes, adTemplatesRes] = await Promise.all([
+    supabase
+      .from('questionnaires')
+      .select('id, title, slug, is_published, updated_at, domain:project_domains(domain)')
+      .eq('project_id', active.id)
+      .order('updated_at', { ascending: false })
+      .limit(50),
+    supabase
+      .from('ad_templates')
+      .select('id, title, updated_at')
+      .eq('project_id', active.id)
+      .order('updated_at', { ascending: false })
+      .limit(50),
+  ]);
+
+  const questionnaires = (questionnairesRes.data ?? []).map((q) => ({
+    id: q.id,
+    title: q.title,
+    slug: q.slug,
+    is_published: q.is_published,
+    updated_at: q.updated_at,
+    domain: Array.isArray(q.domain) ? q.domain[0] ?? null : q.domain ?? null,
+  }));
+  const adTemplates = adTemplatesRes.data ?? [];
+
   return (
     <SidebarInner
       projects={projects}
       activeProjectId={active.id}
       userEmail={user.email ?? ''}
+      questionnaires={questionnaires}
+      adTemplates={adTemplates}
     >
       {children}
     </SidebarInner>

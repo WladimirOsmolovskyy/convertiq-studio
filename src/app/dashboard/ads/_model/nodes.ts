@@ -117,10 +117,29 @@ export const STANDARD_SIZES: AdSize[] = [
   { name: 'Medium Rectangle', width: 300, height: 250 },
 ];
 
+export type AdVariableProperty = 'text' | 'fontSize' | 'fontFamily' | 'fill';
+export type AdVariableType = 'text' | 'number' | 'color';
+
+export interface AdVariable {
+  id: string;
+  /** User-facing label (e.g. "Headline Text"). */
+  label: string;
+  /** Target node id. */
+  nodeId: NodeId;
+  /** Which property on the node this variable drives. */
+  property: AdVariableProperty;
+  /** Input type used to render the form field. */
+  type: AdVariableType;
+  /** Fallback value when no user input is supplied. */
+  defaultValue: string | number;
+}
+
 export interface AdDocument {
   id: string;
   name: string;
   size: { width: number; height: number };
   root: FrameNode;
   slots: Record<string, NodeId>;
+  /** List of template variables. Mirrored to the row's `variables` column on save. */
+  variables?: AdVariable[];
 }

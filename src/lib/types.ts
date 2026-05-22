@@ -274,6 +274,45 @@ export interface ProjectDomain {
 
 /* ─── Questionnaire ─────────────────────────────────────────────── */
 
+/** Where a lead field gets its value from.
+ *  - `url`: capture a URL query parameter on page load (works on templates +
+ *    per-questionnaire fields).
+ *  - `question`: bind to a specific question's answer; resolved at submit
+ *    time. Only valid on per-questionnaire fields — templates can't reference
+ *    question ids that don't exist in their context.
+ *  - `custom`: a standalone input rendered as a lead-capture step before
+ *    submission (email / phone / number / free text). Works on both templates
+ *    and per-questionnaire fields.
+ */
+export type LeadFieldKind = 'url' | 'question' | 'custom';
+
+/** Input type for kind='custom'. Maps to the rendered <input type=…>. */
+export type LeadFieldInputType = 'text' | 'email' | 'tel' | 'number';
+
+export interface LeadField {
+  id: string;
+  label: string;
+  /** Defaults to 'url' when absent for backward compatibility with pre-kind fields. */
+  kind?: LeadFieldKind;
+  /** URL query parameter name to capture, e.g. "utm_campaign". Used when kind='url'. */
+  urlParam?: string;
+  /** Source question id. Used when kind='question'. */
+  questionId?: string;
+  /** Input type. Used when kind='custom'. Defaults to 'text'. */
+  inputType?: LeadFieldInputType;
+  /** Whether the visitor must fill this in before submitting. Custom-only. */
+  required?: boolean;
+}
+
+export interface LeadFieldTemplate {
+  id: string;
+  user_id: string;
+  name: string;
+  fields: LeadField[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Questionnaire {
   id: string;
   user_id: string;
@@ -282,6 +321,11 @@ export interface Questionnaire {
   title: string;
   slug: string;
   is_published: boolean;
+  /** Per-questionnaire lead fields (don't affect siblings or templates). */
+  lead_fields: LeadField[];
+  /** Optional FK to a project-scoped LeadFieldTemplate. When set, the template's
+   *  fields are merged with this questionnaire's lead_fields at runtime. */
+  lead_field_template_id: string | null;
   created_at: string;
   updated_at: string;
 }

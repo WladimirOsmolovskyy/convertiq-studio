@@ -72,10 +72,17 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
 
   if (!questionnaire) notFound();
 
-  const [questionsRes, designRes, resultsRes] = await Promise.all([
+  const [questionsRes, designRes, resultsRes, templateRes] = await Promise.all([
     supabase.from('questions').select('*').eq('questionnaire_id', questionnaire.id).order('sort_order'),
     supabase.from('questionnaire_designs').select('config').eq('questionnaire_id', questionnaire.id).single(),
     supabase.from('score_results').select('*').eq('questionnaire_id', questionnaire.id).order('sort_order'),
+    questionnaire.lead_field_template_id
+      ? supabase
+          .from('lead_field_templates')
+          .select('fields')
+          .eq('id', questionnaire.lead_field_template_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const questions = questionsRes.data || [];
@@ -102,6 +109,7 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
       scoringRules={scoringRes.data || []}
       scoreResults={resultsRes.data || []}
       design={design}
+      templateLeadFields={templateRes.data?.fields ?? []}
     />
   );
 }

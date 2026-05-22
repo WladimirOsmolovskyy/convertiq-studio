@@ -1,0 +1,141 @@
+.intro {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  max-width: 720px;
+  margin-bottom: 1.5rem;
+}
+
+.empty {
+  padding: 1.5rem;
+  border: 1px dashed var(--separator);
+  border-radius: var(--radius-xl);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-xl);
+  padding: 0.625rem 0.75rem;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.expand {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.nameInput {
+  flex: 1;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-md);
+  outline: none;
+  min-width: 0;
+}
+.nameInput:focus {
+  background: var(--fill-quaternary);
+}
+
+.count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.body {
+  margin-top: 0.625rem;
+  padding-left: 1.5rem;
+}
+
+.rowHeader {
+  display: grid;
+  grid-template-columns: 1fr 1fr 36px;
+  gap: 0.5rem;
+  padding: 0 0.625rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.fieldList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 36px;
+  gap: 0.5rem;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-xl);
+  padding: 0.5rem 0.625rem;
+}
+
+.input {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--text);
+  min-width: 0;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.inputMono {
+  font-family: ui-monospace, 'SF Mono', monospace;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.625rem;
+}
+.footerRight {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}

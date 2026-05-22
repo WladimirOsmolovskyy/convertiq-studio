@@ -1,7 +1,7 @@
 .editor {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: calc(100vh - var(--topbar-height));
   background: var(--bg);
   overflow: hidden;
 }
@@ -50,6 +50,28 @@
   letter-spacing: -0.014em;
   color: var(--text);
   margin-right: 0.5rem;
+}
+.topBarTitleInput {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+  color: var(--text);
+  border: none;
+  background: transparent;
+  outline: none;
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  min-width: 80px;
+  max-width: 320px;
+  margin-right: 0.5rem;
+  font-family: inherit;
+}
+.topBarTitleInput:hover { background: var(--fill-quaternary); }
+.topBarTitleInput:focus { background: var(--fill-quaternary); }
+.topBarHint {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-right: 0.25rem;
 }
 
 .topBarGroup {
@@ -300,6 +322,47 @@ input.field[type='number'] { padding-right: 0.3rem; }
   width: 100%;
   align-items: center;
 }
+
+.bindRow {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  flex-wrap: wrap;
+}
+.bindControl { flex: 1; min-width: 0; }
+.bindBtn {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--separator);
+  border-radius: 5px;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+.bindBtn:hover { background: var(--fill-quaternary); color: var(--text); }
+.bindBtnActive {
+  background: var(--accent-muted);
+  border-color: var(--accent-muted);
+  color: var(--accent);
+}
+.bindChip {
+  width: 100%;
+  font-size: 0.6875rem;
+  color: var(--accent);
+  padding: 0.15rem 0.4rem;
+  background: var(--accent-muted);
+  border-radius: 4px;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .swatch {
   position: relative;
   width: 22px;
@@ -318,6 +381,226 @@ input.field[type='number'] { padding-right: 0.3rem; }
   cursor: pointer;
   opacity: 0;
   padding: 0;
+}
+
+/* ─── Generate view ──────────────────────────────────────────── */
+.genNameInput {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  border: none;
+  background: transparent;
+  outline: none;
+  padding: 0.2rem 0.4rem;
+  border-radius: 8px;
+  color: var(--text);
+  font-family: inherit;
+  min-width: 180px;
+  max-width: 480px;
+}
+.genNameInput:hover, .genNameInput:focus { background: var(--fill-quaternary); }
+
+.genGrid {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 880px) {
+  .genGrid { grid-template-columns: 1fr; }
+}
+
+.genForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-xl);
+  position: sticky;
+  top: 1rem;
+}
+.genSection {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.genHint {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: -0.25rem 0 0.75rem;
+}
+.genEmpty {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.genField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.genFieldLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.genColorRow {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.genPreviews { display: flex; flex-direction: column; gap: 0.75rem; }
+.genPreviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+.genPreviewCard {
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-xl);
+  padding: 0.875rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+.genPreviewCard:hover { border-color: var(--border-hover); }
+.genPreviewCardSelected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.genPreviewHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+.genPreviewName {
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.008em;
+}
+.genPreviewDims {
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  flex: 1;
+}
+.genCheck {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1px solid var(--separator);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: transparent;
+  flex-shrink: 0;
+}
+.genCheckOn { background: var(--accent); border-color: var(--accent); color: #fff; }
+.genPreviewBody {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    repeating-conic-gradient(var(--fill-quaternary) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
+  border-radius: var(--radius-md);
+  padding: 0.5rem;
+  min-height: 240px;
+}
+
+/* ─── Variables panel ────────────────────────────────────────── */
+.varsPanel {
+  border-top: 1px solid var(--separator);
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  max-height: 40%;
+  overflow-y: auto;
+}
+.varsTitle {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 0.25rem 0.5rem;
+}
+.varsEmpty {
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.varsList { display: flex; flex-direction: column; gap: 2px; }
+.varsRow {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 6px;
+}
+.varsRow:hover { background: var(--fill-quaternary); }
+.varsRowName {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+.varsLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.varsKind {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.varsAction {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+.varsAction:hover { background: var(--fill-tertiary); color: var(--text); }
+.varsRename {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text);
+  font-family: inherit;
+  min-width: 0;
 }
 
 /* ─── Canvas area ────────────────────────────────────────────── */

@@ -1,9 +1,17 @@
 import type { Metadata } from 'next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Questionnaire Builder',
   description: 'Create interactive questionnaires with branching logic, scoring, and custom design',
+  icons: {
+    icon: [
+      { url: '/icon.png', media: '(prefers-color-scheme: light)' },
+      { url: '/icon-dark.png', media: '(prefers-color-scheme: dark)' },
+    ],
+  },
 };
 
 const envBanner = (() => {
@@ -47,6 +55,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         {envBanner}
+        <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
