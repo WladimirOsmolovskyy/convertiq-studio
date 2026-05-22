@@ -280,8 +280,14 @@ export interface ProjectDomain {
  *  - `question`: bind to a specific question's answer; resolved at submit
  *    time. Only valid on per-questionnaire fields — templates can't reference
  *    question ids that don't exist in their context.
+ *  - `custom`: a standalone input rendered as a lead-capture step before
+ *    submission (email / phone / number / free text). Works on both templates
+ *    and per-questionnaire fields.
  */
-export type LeadFieldKind = 'url' | 'question';
+export type LeadFieldKind = 'url' | 'question' | 'custom';
+
+/** Input type for kind='custom'. Maps to the rendered <input type=…>. */
+export type LeadFieldInputType = 'text' | 'email' | 'tel' | 'number';
 
 export interface LeadField {
   id: string;
@@ -292,6 +298,10 @@ export interface LeadField {
   urlParam?: string;
   /** Source question id. Used when kind='question'. */
   questionId?: string;
+  /** Input type. Used when kind='custom'. Defaults to 'text'. */
+  inputType?: LeadFieldInputType;
+  /** Whether the visitor must fill this in before submitting. Custom-only. */
+  required?: boolean;
 }
 
 export interface LeadFieldTemplate {

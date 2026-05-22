@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import type { Question, QuestionBranch, ScoringRule, ScoreResult, DesignConfig, Questionnaire, LeadField } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { nanoid } from 'nanoid';
-import { resolveLeadFields } from '@/lib/leadFields';
+import { resolveLeadFields, isCustomField } from '@/lib/leadFields';
+import { buildLeadPayload } from '@/lib/leadPayload';
 import styles from './published.module.css';
 
 interface Props {
@@ -28,21 +29,32 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
   const [submitting, setSubmitting] = useState(false);
   const [rating, setRating] = useState(0);
   const [capturedFields, setCapturedFields] = useState<Record<string, string>>({});
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [showLeadCapture, setShowLeadCapture] = useState(false);
+  const [leadCaptureError, setLeadCaptureError] = useState<string | null>(null);
+
+  const effectiveLeadFields = useMemo(
+    () => resolveLeadFields(templateLeadFields, questionnaire.lead_fields),
+    [templateLeadFields, questionnaire.lead_fields],
+  );
+  const customLeadFields = useMemo(
+    () => effectiveLeadFields.filter(isCustomField),
+    [effectiveLeadFields],
+  );
 
   // Capture URL query params for the effective URL-kind fields on mount.
   // Question-kind fields are resolved later, at submit time.
   useEffect(() => {
-    const fields = resolveLeadFields(templateLeadFields, questionnaire.lead_fields);
-    if (fields.length === 0) return;
+    if (effectiveLeadFields.length === 0) return;
     const params = new URLSearchParams(window.location.search);
     const captured: Record<string, string> = {};
-    for (const f of fields) {
+    for (const f of effectiveLeadFields) {
       if ((f.kind ?? 'url') !== 'url' || !f.urlParam) continue;
       const v = params.get(f.urlParam);
       if (v) captured[f.id] = v;
     }
     setCapturedFields(captured);
-  }, [templateLeadFields, questionnaire.lead_fields]);
+  }, [effectiveLeadFields]);
 
   const currentQuestion = questions[currentIndex];
   const progress = questions.length > 0 ? ((questionPath.length) / questions.length) * 100 : 0;
@@ -123,12 +135,31 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
 
   const handleNext = async () => {
     const nextIdx = getNextQuestionIndex(currentIndex, answers);
-    if (nextIdx === -1 || nextIdx >= questions.length) {
+    const reachedEnd = nextIdx === -1 || nextIdx >= questions.length;
+    if (reachedEnd) {
+      // If there are custom fields to fill in, gate submission behind the
+      // lead-capture step instead of finishing straight away.
+      if (customLeadFields.length > 0 && !showLeadCapture) {
+        setShowLeadCapture(true);
+        return;
+      }
       await submitAndFinish();
     } else {
       setCurrentIndex(nextIdx);
       setQuestionPath((prev) => [...prev, nextIdx]);
     }
+  };
+
+  const handleLeadCaptureSubmit = async () => {
+    const missing = customLeadFields.find(
+      (f) => f.required && !(customFieldValues[f.id] ?? '').trim(),
+    );
+    if (missing) {
+      setLeadCaptureError(`Please fill in: ${missing.label || 'required field'}`);
+      return;
+    }
+    setLeadCaptureError(null);
+    await submitAndFinish();
   };
 
   const handleBack = () => {
@@ -148,11 +179,16 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
     const matched = scoreResults.find((r) => score >= r.min_score && score <= r.max_score);
     setMatchedResult(matched || null);
 
-    // Resolve question-bound lead fields from the answers we collected.
-    // URL fields were already captured into capturedFields on mount.
-    const effectiveFields = resolveLeadFields(templateLeadFields, questionnaire.lead_fields);
+    // Build the final lead field map. Three sources:
+    //   - URL fields (already captured into capturedFields on mount)
+    //   - Custom inputs (typed into the lead-capture step)
+    //   - Question-bound fields (read from the answers map at submit time)
     const leadFieldValues: Record<string, string> = { ...capturedFields };
-    for (const f of effectiveFields) {
+    for (const [id, v] of Object.entries(customFieldValues)) {
+      const trimmed = v.trim();
+      if (trimmed) leadFieldValues[id] = trimmed;
+    }
+    for (const f of effectiveLeadFields) {
       if (f.kind !== 'question' || !f.questionId) continue;
       const ans = answers[f.questionId];
       if (!ans) continue;
@@ -171,17 +207,41 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
     try {
       const supabase = createClient();
       const responseId = crypto.randomUUID();
+      const completedAtIso = new Date().toISOString();
+
+      // Build the webhook-ready payload. Not posted anywhere yet — the user
+      // will wire the actual transport. Stored on the response so it can be
+      // re-sent / inspected later without re-deriving from raw tables.
+      const payload = buildLeadPayload({
+        responseId,
+        sessionId,
+        startedAt: completedAtIso, // started_at is server-defaulted; close enough for now
+        completedAt: completedAtIso,
+        totalScore: score,
+        matchedResult: matched ?? null,
+        host: typeof window !== 'undefined' ? window.location.hostname : null,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        questionnaire,
+        templateLeadFields,
+        questions,
+        answers,
+        leadFieldValues,
+        scoringRules,
+      });
+
       const { error: insertErr } = await supabase.from('responses').insert({
         id: responseId,
         questionnaire_id: questionnaire.id,
         session_id: sessionId,
         total_score: score,
         result_id: matched?.id || null,
-        completed_at: new Date().toISOString(),
+        completed_at: completedAtIso,
         metadata: {
           user_agent: navigator.userAgent,
           host: window.location.hostname,
           lead_fields: leadFieldValues,
+          /** Snapshot of the webhook payload built from this submission. */
+          webhook_payload: payload,
         },
       });
 
@@ -256,15 +316,102 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
             <div className={styles.progressWrap}>
               <div className={styles.progressLabel} style={{ color: design.colors.textMuted }}>
                 <span>{questionnaire.title}</span>
-                <span>{Math.round(progress)}%</span>
+                <span>{showLeadCapture ? 100 : Math.round(progress)}%</span>
               </div>
               <div className={styles.progressBar} style={{ background: design.components.progress.background, height: `${design.components.progress.height}px` }}>
-                <div className={styles.progressFill} style={{ width: `${progress}%`, background: design.components.progress.fillColor }} />
+                <div className={styles.progressFill} style={{ width: `${showLeadCapture ? 100 : progress}%`, background: design.components.progress.fillColor }} />
               </div>
             </div>
 
+            {showLeadCapture && (
+              <div
+                className={styles.questionWrap}
+                style={{
+                  background: design.components.question.background,
+                  border: design.components.question.border,
+                  boxShadow: design.components.question.shadow,
+                  padding: design.components.question.padding,
+                  borderRadius: `${design.layout.borderRadius}px`,
+                }}
+              >
+                <h2
+                  className={styles.questionTitle}
+                  style={{
+                    fontFamily: design.typography.headingFont,
+                    fontWeight: design.typography.heading?.weight ?? design.typography.headingWeight,
+                    fontSize: `${design.typography.heading?.size ?? Math.round(design.typography.baseFontSize * 1.375)}px`,
+                    lineHeight: design.typography.heading?.lineHeight ?? 1.2,
+                    letterSpacing: `${design.typography.heading?.letterSpacing ?? -0.02}em`,
+                    color: design.typography.heading?.color ?? design.colors.text,
+                  }}
+                >
+                  Almost done
+                </h2>
+                <p
+                  className={styles.questionDescription}
+                  style={{ color: design.colors.textMuted }}
+                >
+                  Tell us a little about yourself to see your result.
+                </p>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem', marginTop: '1rem' }}>
+                  {customLeadFields.map((f) => (
+                    <label key={f.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                      <span
+                        style={{
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                          color: design.colors.text,
+                        }}
+                      >
+                        {f.label}
+                        {f.required && (
+                          <span className={styles.requiredStar} aria-hidden>
+                            *
+                          </span>
+                        )}
+                      </span>
+                      <input
+                        className={styles.publishedInput}
+                        type={f.inputType ?? 'text'}
+                        value={customFieldValues[f.id] ?? ''}
+                        onChange={(e) =>
+                          setCustomFieldValues((prev) => ({ ...prev, [f.id]: e.target.value }))
+                        }
+                        required={f.required}
+                        autoComplete={
+                          f.inputType === 'email'
+                            ? 'email'
+                            : f.inputType === 'tel'
+                              ? 'tel'
+                              : undefined
+                        }
+                        style={{
+                          background: design.components.input.background,
+                          border: design.components.input.border,
+                          borderRadius: `${design.components.input.borderRadius}px`,
+                          color: design.colors.text,
+                        }}
+                      />
+                    </label>
+                  ))}
+
+                  {leadCaptureError && (
+                    <div
+                      style={{
+                        fontSize: '0.8125rem',
+                        color: 'var(--error, #e44)',
+                      }}
+                    >
+                      {leadCaptureError}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Current Question */}
-            {currentQuestion && (
+            {currentQuestion && !showLeadCapture && (
               <div className={styles.questionWrap} key={currentQuestion.id} style={{
                 background: design.components.question.background,
                 border: design.components.question.border,
@@ -407,26 +554,41 @@ export default function QuestionnaireRenderer({ questionnaire, questions, branch
             <div className={styles.navButtons}>
               <button
                 className={styles.backBtn}
-                onClick={handleBack}
-                disabled={questionPath.length <= 1}
+                onClick={() => {
+                  if (showLeadCapture) {
+                    setShowLeadCapture(false);
+                    setLeadCaptureError(null);
+                  } else {
+                    handleBack();
+                  }
+                }}
+                disabled={!showLeadCapture && questionPath.length <= 1}
                 style={{ color: design.colors.textMuted }}
               >
                 ← Back
               </button>
               <button
                 className={styles.navBtn}
-                onClick={handleNext}
-                disabled={!canProceed || submitting}
+                onClick={showLeadCapture ? handleLeadCaptureSubmit : handleNext}
+                disabled={(!showLeadCapture && !canProceed) || submitting}
                 style={{
                   background: design.components.button.background,
                   color: design.components.button.color,
                   borderRadius: `${design.components.button.borderRadius}px`,
                   padding: design.components.button.padding,
                   fontSize: `${design.components.button.fontSize}px`,
-                  opacity: canProceed ? 1 : 0.5,
+                  opacity: (!showLeadCapture && !canProceed) ? 0.5 : 1,
                 }}
               >
-                {submitting ? 'Submitting...' : getNextQuestionIndex(currentIndex, answers) === -1 ? 'Submit' : 'Next'}
+                {submitting
+                  ? 'Submitting...'
+                  : showLeadCapture
+                    ? 'Submit'
+                    : getNextQuestionIndex(currentIndex, answers) === -1
+                      ? customLeadFields.length > 0
+                        ? 'Continue'
+                        : 'Submit'
+                      : 'Next'}
               </button>
             </div>
           </>

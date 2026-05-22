@@ -7,15 +7,19 @@ import type { LeadField } from '@/lib/types';
  *  - URL fields are deduplicated by `urlParam` (case-insensitive). A
  *    questionnaire-level URL field with the same param as a template field
  *    overrides the template's entry (lets a questionnaire refine the label).
- *  - Question fields only exist at the questionnaire level. They're added
- *    after URL fields, in declaration order.
+ *  - Custom fields are deduplicated by `id` — same template/per-q rules.
+ *  - Question fields only exist at the questionnaire level. They're appended
+ *    in declaration order.
  *  - Anything without a kind is treated as `url` for backward compatibility.
+ *
+ * Ordering: URL → custom → question. Stable within each group.
  */
 export function resolveLeadFields(
   templateFields: LeadField[] | null | undefined,
   questionnaireFields: LeadField[] | null | undefined,
 ): LeadField[] {
   const urlByParam = new Map<string, LeadField>();
+  const customById = new Map<string, LeadField>();
   const questionFields: LeadField[] = [];
 
   const addUrl = (f: LeadField) => {
@@ -24,27 +28,24 @@ export function resolveLeadFields(
   };
 
   for (const f of templateFields ?? []) {
-    // Templates only carry URL-kind fields by design.
-    if ((f.kind ?? 'url') === 'url') addUrl(f);
+    const kind = f.kind ?? 'url';
+    if (kind === 'url') addUrl(f);
+    else if (kind === 'custom') customById.set(f.id, f);
+    // question-kind fields on a template are nonsensical — skip silently.
   }
   for (const f of questionnaireFields ?? []) {
     const kind = f.kind ?? 'url';
-    if (kind === 'url') {
-      addUrl(f);
-    } else if (kind === 'question') {
+    if (kind === 'url') addUrl(f);
+    else if (kind === 'custom') customById.set(f.id, f);
+    else if (kind === 'question') {
       if (f.questionId) questionFields.push(f);
     }
   }
 
-  return [...urlByParam.values(), ...questionFields];
+  return [...urlByParam.values(), ...customById.values(), ...questionFields];
 }
 
-/** True for fields that get their value from the URL on page load. */
-export function isUrlField(f: LeadField): boolean {
-  return (f.kind ?? 'url') === 'url';
-}
-
-/** True for fields bound to a questionnaire question's answer. */
-export function isQuestionField(f: LeadField): boolean {
-  return f.kind === 'question' && !!f.questionId;
-}
+export const isUrlField = (f: LeadField): boolean => (f.kind ?? 'url') === 'url';
+export const isCustomField = (f: LeadField): boolean => f.kind === 'custom';
+export const isQuestionField = (f: LeadField): boolean =>
+  f.kind === 'question' && !!f.questionId;

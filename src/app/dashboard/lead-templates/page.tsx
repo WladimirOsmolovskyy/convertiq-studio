@@ -190,39 +190,95 @@ function TemplateCard({
 
       {expanded && (
         <div className={styles.body}>
-          {(template.fields || []).length > 0 && (
-            <div className={styles.rowHeader}>
-              <span>Label</span>
-              <span>URL parameter</span>
-              <span></span>
-            </div>
-          )}
           <div className={styles.fieldList}>
-            {(template.fields || []).map((field) => (
-              <div key={field.id} className={styles.row}>
-                <input
-                  value={field.label}
-                  onChange={(e) => updateField(field.id, { label: e.target.value })}
-                  placeholder="Display label"
-                  className={styles.input}
-                />
-                <input
-                  value={field.urlParam}
-                  onChange={(e) => updateField(field.id, { urlParam: e.target.value.trim() })}
-                  placeholder="utm_campaign"
-                  spellCheck={false}
-                  className={`${styles.input} ${styles.inputMono}`}
-                />
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => removeField(field.id)}
-                  aria-label="Remove field"
-                  style={{ padding: '0.4rem', justifyContent: 'center' }}
-                >
-                  <Trash2 size={14} strokeWidth={1.75} />
-                </button>
-              </div>
-            ))}
+            {(template.fields || []).map((field) => {
+              const kind = field.kind ?? 'url';
+              return (
+                <div key={field.id} className={styles.row} style={{ gridTemplateColumns: '120px 1fr 1.4fr 36px' }}>
+                  <select
+                    value={kind}
+                    onChange={(e) => {
+                      const next = e.target.value as 'url' | 'custom';
+                      if (next === 'url') {
+                        updateField(field.id, {
+                          kind: 'url',
+                          inputType: undefined,
+                          required: undefined,
+                        });
+                      } else {
+                        updateField(field.id, {
+                          kind: 'custom',
+                          urlParam: undefined,
+                          inputType: field.inputType ?? 'text',
+                        });
+                      }
+                    }}
+                    className={styles.input}
+                  >
+                    <option value="url">URL param</option>
+                    <option value="custom">Custom input</option>
+                  </select>
+                  <input
+                    value={field.label}
+                    onChange={(e) => updateField(field.id, { label: e.target.value })}
+                    placeholder="Display label"
+                    className={styles.input}
+                  />
+                  {kind === 'url' ? (
+                    <input
+                      value={field.urlParam ?? ''}
+                      onChange={(e) => updateField(field.id, { urlParam: e.target.value.trim() })}
+                      placeholder="utm_campaign"
+                      spellCheck={false}
+                      className={`${styles.input} ${styles.inputMono}`}
+                    />
+                  ) : (
+                    <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
+                      <select
+                        value={field.inputType ?? 'text'}
+                        onChange={(e) =>
+                          updateField(field.id, {
+                            inputType: e.target.value as 'text' | 'email' | 'tel' | 'number',
+                          })
+                        }
+                        className={styles.input}
+                      >
+                        <option value="text">Text</option>
+                        <option value="email">Email</option>
+                        <option value="tel">Phone</option>
+                        <option value="number">Number</option>
+                      </select>
+                      <label
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.25rem',
+                          fontSize: '0.75rem',
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!field.required}
+                          onChange={(e) => updateField(field.id, { required: e.target.checked })}
+                        />
+                        Required
+                      </label>
+                    </div>
+                  )}
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => removeField(field.id)}
+                    aria-label="Remove field"
+                    style={{ padding: '0.4rem', justifyContent: 'center' }}
+                  >
+                    <Trash2 size={14} strokeWidth={1.75} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
           <div className={styles.footer}>
             <button className="btn btn-ghost btn-sm" onClick={addField}>

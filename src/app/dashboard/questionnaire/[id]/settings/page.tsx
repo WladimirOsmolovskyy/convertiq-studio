@@ -157,6 +157,15 @@ export default function SettingsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {fields.map((field) => {
                 const kind = field.kind ?? 'url';
+                const inputStyle = {
+                  padding: '0.4rem 0.55rem',
+                  border: '1px solid var(--separator)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--surface)',
+                  font: 'inherit',
+                  fontSize: '0.8125rem',
+                  color: 'var(--text)',
+                } as const;
                 return (
                   <div
                     key={field.id}
@@ -174,41 +183,43 @@ export default function SettingsPage() {
                     <select
                       value={kind}
                       onChange={(e) => {
-                        const next = e.target.value as 'url' | 'question';
+                        const next = e.target.value as 'url' | 'question' | 'custom';
                         if (next === 'url') {
-                          updateLeadField(field.id, { kind: 'url', questionId: undefined });
+                          updateLeadField(field.id, {
+                            kind: 'url',
+                            questionId: undefined,
+                            inputType: undefined,
+                            required: undefined,
+                          });
+                        } else if (next === 'question') {
+                          updateLeadField(field.id, {
+                            kind: 'question',
+                            urlParam: undefined,
+                            inputType: undefined,
+                            required: undefined,
+                          });
                         } else {
-                          updateLeadField(field.id, { kind: 'question', urlParam: undefined });
+                          updateLeadField(field.id, {
+                            kind: 'custom',
+                            urlParam: undefined,
+                            questionId: undefined,
+                            inputType: field.inputType ?? 'text',
+                          });
                         }
                       }}
-                      style={{
-                        padding: '0.4rem 0.55rem',
-                        border: '1px solid var(--separator)',
-                        borderRadius: 'var(--radius-md)',
-                        background: 'var(--surface)',
-                        font: 'inherit',
-                        fontSize: '0.8125rem',
-                        color: 'var(--text)',
-                      }}
+                      style={inputStyle}
                     >
                       <option value="url">URL param</option>
                       <option value="question">Question</option>
+                      <option value="custom">Custom input</option>
                     </select>
                     <input
                       value={field.label}
                       onChange={(e) => updateLeadField(field.id, { label: e.target.value })}
                       placeholder="Display label"
-                      style={{
-                        padding: '0.4rem 0.55rem',
-                        border: '1px solid var(--separator)',
-                        borderRadius: 'var(--radius-md)',
-                        background: 'var(--surface)',
-                        font: 'inherit',
-                        fontSize: '0.8125rem',
-                        color: 'var(--text)',
-                      }}
+                      style={inputStyle}
                     />
-                    {kind === 'url' ? (
+                    {kind === 'url' && (
                       <input
                         value={field.urlParam ?? ''}
                         onChange={(e) =>
@@ -217,31 +228,18 @@ export default function SettingsPage() {
                         placeholder="utm_campaign"
                         spellCheck={false}
                         style={{
-                          padding: '0.4rem 0.55rem',
-                          border: '1px solid var(--separator)',
-                          borderRadius: 'var(--radius-md)',
-                          background: 'var(--surface)',
-                          font: 'inherit',
-                          fontSize: '0.8125rem',
-                          color: 'var(--text)',
+                          ...inputStyle,
                           fontFamily: "ui-monospace, 'SF Mono', monospace",
                         }}
                       />
-                    ) : (
+                    )}
+                    {kind === 'question' && (
                       <select
                         value={field.questionId ?? ''}
                         onChange={(e) =>
                           updateLeadField(field.id, { questionId: e.target.value || undefined })
                         }
-                        style={{
-                          padding: '0.4rem 0.55rem',
-                          border: '1px solid var(--separator)',
-                          borderRadius: 'var(--radius-md)',
-                          background: 'var(--surface)',
-                          font: 'inherit',
-                          fontSize: '0.8125rem',
-                          color: 'var(--text)',
-                        }}
+                        style={inputStyle}
                       >
                         <option value="">Pick a question…</option>
                         {questions.map((q) => (
@@ -250,6 +248,44 @@ export default function SettingsPage() {
                           </option>
                         ))}
                       </select>
+                    )}
+                    {kind === 'custom' && (
+                      <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center' }}>
+                        <select
+                          value={field.inputType ?? 'text'}
+                          onChange={(e) =>
+                            updateLeadField(field.id, {
+                              inputType: e.target.value as 'text' | 'email' | 'tel' | 'number',
+                            })
+                          }
+                          style={inputStyle}
+                        >
+                          <option value="text">Text</option>
+                          <option value="email">Email</option>
+                          <option value="tel">Phone</option>
+                          <option value="number">Number</option>
+                        </select>
+                        <label
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.25rem',
+                            fontSize: '0.75rem',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!field.required}
+                            onChange={(e) =>
+                              updateLeadField(field.id, { required: e.target.checked })
+                            }
+                          />
+                          Required
+                        </label>
+                      </div>
                     )}
                     <button
                       className="btn btn-ghost btn-sm"
