@@ -156,6 +156,11 @@ export default function SidebarInner({
         p.startsWith('/dashboard/leads') ||
         /^\/dashboard\/questionnaire\/[^/]+\/leads/.test(p),
     },
+    {
+      label: 'Audiences',
+      path: qTab('audiences'),
+      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/audiences/.test(p),
+    },
   ];
 
   const sections: NavSection[] = [

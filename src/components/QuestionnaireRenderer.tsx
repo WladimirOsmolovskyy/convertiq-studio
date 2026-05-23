@@ -28,6 +28,7 @@ import { createClient } from '@/lib/supabase/client';
 import { nanoid } from 'nanoid';
 import type {
   AnswersMap,
+  Audience,
   DesignConfig,
   LeadField,
   Question,
@@ -38,6 +39,7 @@ import type {
 } from '@/lib/types';
 import { isCustomField, resolveLeadFields } from '@/lib/leadFields';
 import { buildLeadPayload } from '@/lib/leadPayload';
+import { assignAudience, countRedFlags } from '@/lib/audiences/assign';
 import ResultPageRenderer from '@/components/ResultPageRenderer';
 import { projectAnswers, type ResultRenderContext } from '@/lib/resultVariables';
 
@@ -50,6 +52,9 @@ export interface QuestionnaireRendererProps {
   scoringRules: ScoringRule[];
   resultPages: ResultPage[];
   design: DesignConfig;
+  /** Audiences (with score ranges) configured on this questionnaire.
+   *  Used to assign a bucket to each completed response. */
+  audiences?: Audience[];
   /** CSS module providing the class surface this component uses. */
   styles: StylesMap;
   /** 'public' (default) or 'preview'. Preview shows banner + restart UI and
@@ -69,6 +74,7 @@ export default function QuestionnaireRenderer({
   scoringRules,
   resultPages,
   design,
+  audiences,
   styles,
   mode = 'public',
   templateLeadFields,
@@ -302,6 +308,19 @@ export default function QuestionnaireRenderer({
     const matched = resultPages.find((r) => score >= r.min_score && score <= r.max_score);
     setMatchedPage(matched || null);
 
+    const redFlagCount = countRedFlags(questions, finalAnswers);
+    const audienceList = audiences ?? [];
+    const audienceId = assignAudience({
+      totalScore: score,
+      redFlagCount,
+      redFlagThreshold: questionnaire.red_flag_threshold ?? null,
+      redFlagAudienceId: questionnaire.red_flag_audience_id ?? null,
+      audiences: audienceList,
+    });
+    const matchedAudience = audienceId
+      ? audienceList.find((a) => a.id === audienceId) ?? null
+      : null;
+
     // Rebuild lead-field values against `finalAnswers` rather than the
     // memoized snapshot — submitAndFinish may be called with a fresher
     // answers map than what's in state right now.
@@ -335,6 +354,7 @@ export default function QuestionnaireRenderer({
           completedAt: completedAtIso,
           totalScore: score,
           matchedResult: matched ?? null,
+          matchedAudience,
           host: typeof window !== 'undefined' ? window.location.hostname : null,
           userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
           questionnaire,
@@ -351,6 +371,7 @@ export default function QuestionnaireRenderer({
           session_id: sessionId,
           total_score: score,
           result_id: matched?.id || null,
+          audience_id: audienceId,
           completed_at: completedAtIso,
           metadata: {
             user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,

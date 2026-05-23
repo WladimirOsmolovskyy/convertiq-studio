@@ -8,6 +8,8 @@ import type {
   DesignConfig,
   Questionnaire,
   LeadField,
+  Audience,
+  AudienceScoreRange,
 } from '@/lib/types';
 import { defaultDesign, defaultResultPageContent } from '@/lib/types';
 import {
@@ -21,6 +23,17 @@ import { createClient } from '@/lib/supabase/client';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
+const DEFAULT_AUDIENCE_COLORS = [
+  '#007aff',
+  '#34c759',
+  '#ff9500',
+  '#ff3b30',
+  '#af52de',
+  '#5ac8fa',
+  '#ffcc00',
+  '#5856d6',
+];
+
 interface QuestionnaireState {
   questionnaire: Questionnaire | null;
   questions: Question[];
@@ -28,6 +41,7 @@ interface QuestionnaireState {
   scoringRules: ScoringRule[];
   resultPages: ResultPage[];
   design: DesignConfig;
+  audiences: Audience[];
   isDirty: boolean;
   isSaving: boolean;
   saveStatus: SaveStatus;
@@ -45,6 +59,7 @@ interface QuestionnaireState {
   reorderQuestions: (fromIndex: number, toIndex: number) => void;
   addOption: (questionId: string) => void;
   updateOption: (questionId: string, optionId: string, label: string) => void;
+  toggleOptionRedFlag: (questionId: string, optionId: string) => void;
   removeOption: (questionId: string, optionId: string) => void;
   addBranch: (questionId: string) => void;
   updateBranch: (id: string, updates: Partial<QuestionBranch>) => void;
@@ -72,6 +87,19 @@ interface QuestionnaireState {
   updateLeadField: (id: string, updates: Partial<LeadField>) => void;
   removeLeadField: (id: string) => void;
   setLeadFieldTemplate: (templateId: string | null) => void;
+  addAudience: () => void;
+  updateAudience: (id: string, updates: Partial<Audience>) => void;
+  removeAudience: (id: string) => void;
+  reorderAudiences: (fromIndex: number, toIndex: number) => void;
+  addAudienceRange: (audienceId: string) => void;
+  updateAudienceRange: (
+    audienceId: string,
+    rangeId: string,
+    updates: Partial<AudienceScoreRange>,
+  ) => void;
+  removeAudienceRange: (audienceId: string, rangeId: string) => void;
+  setRedFlagThreshold: (threshold: number | null) => void;
+  setRedFlagAudience: (audienceId: string | null) => void;
   hydrate: (data: {
     questionnaire: Questionnaire;
     questions: Question[];
@@ -79,6 +107,7 @@ interface QuestionnaireState {
     scoringRules: ScoringRule[];
     resultPages: ResultPage[];
     design: DesignConfig;
+    audiences: Audience[];
   }) => void;
   reset: () => void;
   saveAll: () => Promise<void>;
@@ -91,6 +120,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
   scoringRules: [],
   resultPages: [],
   design: defaultDesign,
+  audiences: [],
   isDirty: false,
   isSaving: false,
   saveStatus: 'idle' as SaveStatus,
@@ -196,6 +226,20 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
         return {
           ...q,
           options: q.options.map((o) => (o.id === oId ? { ...o, label, value: label.toLowerCase().replace(/\s+/g, '_') } : o)),
+        };
+      }),
+      isDirty: true,
+    }),
+
+  toggleOptionRedFlag: (qId, oId) =>
+    set({
+      questions: get().questions.map((q) => {
+        if (q.id !== qId) return q;
+        return {
+          ...q,
+          options: q.options.map((o) =>
+            o.id === oId ? { ...o, is_red_flag: !o.is_red_flag } : o,
+          ),
         };
       }),
       isDirty: true,
@@ -366,10 +410,111 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
     });
   },
 
+  addAudience: () => {
+    const qId = get().questionnaire?.id ?? '';
+    const audiences = get().audiences;
+    set({
+      audiences: [
+        ...audiences,
+        {
+          id: crypto.randomUUID(),
+          questionnaire_id: qId,
+          name: `Audience ${audiences.length + 1}`,
+          color: DEFAULT_AUDIENCE_COLORS[audiences.length % DEFAULT_AUDIENCE_COLORS.length],
+          sort_order: audiences.length,
+          score_ranges: [],
+        },
+      ],
+      isDirty: true,
+    });
+  },
+
+  updateAudience: (id, updates) =>
+    set({
+      audiences: get().audiences.map((a) => (a.id === id ? { ...a, ...updates } : a)),
+      isDirty: true,
+    }),
+
+  removeAudience: (id) => {
+    const q = get().questionnaire;
+    set({
+      audiences: get().audiences.filter((a) => a.id !== id).map((a, i) => ({ ...a, sort_order: i })),
+      questionnaire:
+        q && q.red_flag_audience_id === id ? { ...q, red_flag_audience_id: null } : q,
+      isDirty: true,
+    });
+  },
+
+  reorderAudiences: (from, to) => {
+    const list = [...get().audiences];
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    set({ audiences: list.map((a, i) => ({ ...a, sort_order: i })), isDirty: true });
+  },
+
+  addAudienceRange: (audienceId) =>
+    set({
+      audiences: get().audiences.map((a) => {
+        if (a.id !== audienceId) return a;
+        return {
+          ...a,
+          score_ranges: [
+            ...a.score_ranges,
+            {
+              id: crypto.randomUUID(),
+              audience_id: audienceId,
+              min_score: 0,
+              max_score: 10,
+              sort_order: a.score_ranges.length,
+            },
+          ],
+        };
+      }),
+      isDirty: true,
+    }),
+
+  updateAudienceRange: (audienceId, rangeId, updates) =>
+    set({
+      audiences: get().audiences.map((a) => {
+        if (a.id !== audienceId) return a;
+        return {
+          ...a,
+          score_ranges: a.score_ranges.map((r) => (r.id === rangeId ? { ...r, ...updates } : r)),
+        };
+      }),
+      isDirty: true,
+    }),
+
+  removeAudienceRange: (audienceId, rangeId) =>
+    set({
+      audiences: get().audiences.map((a) => {
+        if (a.id !== audienceId) return a;
+        return {
+          ...a,
+          score_ranges: a.score_ranges
+            .filter((r) => r.id !== rangeId)
+            .map((r, i) => ({ ...r, sort_order: i })),
+        };
+      }),
+      isDirty: true,
+    }),
+
+  setRedFlagThreshold: (threshold) => {
+    const q = get().questionnaire;
+    if (!q) return;
+    set({ questionnaire: { ...q, red_flag_threshold: threshold }, isDirty: true });
+  },
+
+  setRedFlagAudience: (audienceId) => {
+    const q = get().questionnaire;
+    if (!q) return;
+    set({ questionnaire: { ...q, red_flag_audience_id: audienceId }, isDirty: true });
+  },
+
   hydrate: (data) => set({ ...data, isDirty: false, isSaving: false, saveStatus: 'idle' }),
 
   reset: () =>
-    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], resultPages: [], design: defaultDesign, isDirty: false, isSaving: false, saveStatus: 'idle' }),
+    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], resultPages: [], design: defaultDesign, audiences: [], isDirty: false, isSaving: false, saveStatus: 'idle' }),
 
   saveAll: async () => {
     // Read fresh state on each call so we always persist the latest store.
@@ -391,6 +536,8 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
           is_published: s.questionnaire.is_published,
           lead_fields: s.questionnaire.lead_fields ?? [],
           lead_field_template_id: s.questionnaire.lead_field_template_id ?? null,
+          red_flag_threshold: s.questionnaire.red_flag_threshold ?? null,
+          red_flag_audience_id: s.questionnaire.red_flag_audience_id ?? null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', qId);
@@ -503,6 +650,68 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
           { onConflict: 'questionnaire_id' },
         );
       if (dErr) console.error('Upsert design failed:', dErr);
+
+      // 10. Sync audiences + their score ranges.
+      // Delete-then-insert is fine here: leads reference audiences via
+      // responses.audience_id with ON DELETE SET NULL, so audience
+      // churn on edit nulls historical assignments rather than failing.
+      // For most editor flows audiences are stable; the only common
+      // mutation is adding/removing ranges.
+      const audienceIds = s.audiences.map((a) => a.id);
+      const { data: existingAudiences } = await supabase
+        .from('questionnaire_audiences')
+        .select('id')
+        .eq('questionnaire_id', qId);
+      const existingIds = (existingAudiences ?? []).map((a: { id: string }) => a.id);
+      const toDelete = existingIds.filter((id) => !audienceIds.includes(id));
+      if (toDelete.length > 0) {
+        const { error: aDelErr } = await supabase
+          .from('questionnaire_audiences')
+          .delete()
+          .in('id', toDelete);
+        if (aDelErr) console.error('Delete audiences failed:', aDelErr);
+      }
+
+      if (s.audiences.length > 0) {
+        const { error: aUpErr } = await supabase
+          .from('questionnaire_audiences')
+          .upsert(
+            s.audiences.map((a) => ({
+              id: a.id,
+              questionnaire_id: qId,
+              name: a.name,
+              color: a.color,
+              sort_order: a.sort_order,
+              updated_at: new Date().toISOString(),
+            })),
+            { onConflict: 'id' },
+          );
+        if (aUpErr) console.error('Upsert audiences failed:', aUpErr);
+
+        if (audienceIds.length > 0) {
+          const { error: rDelErr } = await supabase
+            .from('questionnaire_audience_score_ranges')
+            .delete()
+            .in('audience_id', audienceIds);
+          if (rDelErr) console.error('Delete audience ranges failed:', rDelErr);
+        }
+
+        const allRanges = s.audiences.flatMap((a) =>
+          a.score_ranges.map((r) => ({
+            id: r.id,
+            audience_id: a.id,
+            min_score: r.min_score,
+            max_score: r.max_score,
+            sort_order: r.sort_order,
+          })),
+        );
+        if (allRanges.length > 0) {
+          const { error: rInsErr } = await supabase
+            .from('questionnaire_audience_score_ranges')
+            .insert(allRanges);
+          if (rInsErr) console.error('Insert audience ranges failed:', rInsErr);
+        }
+      }
 
       set({ isDirty: false, isSaving: false, saveStatus: 'saved' });
 

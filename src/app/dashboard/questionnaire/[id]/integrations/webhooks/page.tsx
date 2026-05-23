@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState, use } from 'react';
 import Link from 'next/link';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import { buildLeadPayload } from '@/lib/leadPayload';
+import AudienceFilter from '@/components/AudienceFilter';
 import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, CheckCircle2, AlertCircle, Circle } from 'lucide-react';
+import type { Audience } from '@/lib/types';
 import styles from '../../editor.module.css';
 
 interface Webhook {
@@ -13,6 +15,7 @@ interface Webhook {
   url: string;
   label: string | null;
   enabled: boolean;
+  audience_ids: string[] | null;
   last_attempt_at: string | null;
   last_status: number | null;
   last_error: string | null;
@@ -22,7 +25,7 @@ interface Webhook {
 
 export default function WebhooksPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: questionnaireId } = use(params);
-  const { questionnaire, questions, scoringRules } = useQuestionnaireStore();
+  const { questionnaire, questions, scoringRules, audiences } = useQuestionnaireStore();
 
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +93,10 @@ export default function WebhooksPage({ params }: { params: Promise<{ id: string 
     setWebhooks((prev) => [...prev, body.webhook]);
   };
 
-  const updateWebhook = async (id: string, patch: Partial<Pick<Webhook, 'url' | 'label' | 'enabled'>>) => {
+  const updateWebhook = async (
+    id: string,
+    patch: Partial<Pick<Webhook, 'url' | 'label' | 'enabled' | 'audience_ids'>>,
+  ) => {
     setError(null);
     setWebhooks((prev) => prev.map((w) => (w.id === id ? { ...w, ...patch } : w)));
     const res = await fetch(`/api/lead-webhooks/${id}`, {
@@ -221,6 +227,7 @@ export default function WebhooksPage({ params }: { params: Promise<{ id: string 
                 <WebhookRow
                   key={w.id}
                   webhook={w}
+                  audiences={audiences}
                   onChange={(patch) => updateWebhook(w.id, patch)}
                   onRemove={() => removeWebhook(w.id)}
                 />
@@ -279,11 +286,13 @@ export default function WebhooksPage({ params }: { params: Promise<{ id: string 
 
 function WebhookRow({
   webhook,
+  audiences,
   onChange,
   onRemove,
 }: {
   webhook: Webhook;
-  onChange: (patch: Partial<Pick<Webhook, 'url' | 'label' | 'enabled'>>) => void;
+  audiences: Audience[];
+  onChange: (patch: Partial<Pick<Webhook, 'url' | 'label' | 'enabled' | 'audience_ids'>>) => void;
   onRemove: () => void;
 }) {
   const [label, setLabel] = useState(webhook.label ?? '');
@@ -377,6 +386,14 @@ function WebhookRow({
         >
           <Trash2 size={14} strokeWidth={1.75} />
         </button>
+      </div>
+
+      <div style={{ paddingTop: '0.375rem', borderTop: '1px solid var(--separator)' }}>
+        <AudienceFilter
+          audiences={audiences}
+          value={webhook.audience_ids}
+          onChange={(next) => onChange({ audience_ids: next })}
+        />
       </div>
 
       <StatusBadge webhook={webhook} />

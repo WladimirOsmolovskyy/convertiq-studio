@@ -25,10 +25,11 @@ export async function PATCH(
   }
 
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  const { url, label, enabled } = body as {
+  const { url, label, enabled, audience_ids } = body as {
     url?: string;
     label?: string | null;
     enabled?: boolean;
+    audience_ids?: string[] | null;
   };
   if (url !== undefined) {
     if (typeof url !== 'string') {
@@ -45,6 +46,15 @@ export async function PATCH(
   }
   if (enabled !== undefined) {
     patch.enabled = !!enabled;
+  }
+  if (audience_ids !== undefined) {
+    if (audience_ids === null) {
+      patch.audience_ids = null;
+    } else if (Array.isArray(audience_ids) && audience_ids.every((x) => typeof x === 'string')) {
+      patch.audience_ids = audience_ids;
+    } else {
+      return NextResponse.json({ error: 'audience_ids must be an array of strings or null' }, { status: 400 });
+    }
   }
 
   // RLS hides webhooks the caller doesn't own, so an unauthorized PATCH
