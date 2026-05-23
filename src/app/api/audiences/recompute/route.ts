@@ -1,21 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import type { AnswersMap, Audience, Question } from '@/lib/types';
+import { createAdminClient } from '@/lib/supabase/admin';
+import type { AnswersMap, Audience, Question, ScoringRule } from '@/lib/types';
 import { assignAudience, countRedFlags } from '@/lib/audiences/assign';
+import { calculateTotalScore } from '@/lib/scoring';
 
 /**
- * Recompute responses.audience_id for every response of a questionnaire
- * using the current audience config. Triggered fire-and-forget after the
- * editor saves audience-affecting changes (red-flag toggles, audience
- * CRUD, range CRUD, red-flag rule edits).
+ * Refresh total_score + audience_id for every response of a questionnaire
+ * against the latest config. Fire-and-forget from the editor after every
+ * successful save — idempotent, so over-triggering only costs the read.
  *
- * Auth: owner-only. We use the auth client throughout — RLS already
- * scopes reads + updates to questionnaires the caller owns, and the
- * UPDATE policy in migration 014 covers the writes.
- *
- * Idempotent: only writes when the computed audience_id differs from
- * what's already stored. total_score is not recomputed (scoring config
- * changes are out of scope here).
+ * Auth: ownership is checked via the auth client (RLS). Writes go through
+ * the admin client because the responses table has no owner-update policy.
  */
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -31,8 +27,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'questionnaire_id required' }, { status: 400 });
   }
 
-  // RLS makes this empty if the caller doesn't own the questionnaire.
-  const { data: questionnaire } = await supabase
+  // Ownership check: RLS makes this null when the caller doesn't own the
+  // questionnaire. Once verified, the rest runs through the admin client.
+  const { data: ownedQuestionnaire } = await supabase
+    .from('questionnaires')
+    .select('id')
+    .eq('id', questionnaireId)
+    .maybeSingle();
+  if (!ownedQuestionnaire) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  const admin = createAdminClient();
+
+  const { data: questionnaire } = await admin
     .from('questionnaires')
     .select('id, red_flag_threshold, red_flag_audience_id')
     .eq('id', questionnaireId)
@@ -42,22 +50,31 @@ export async function POST(request: Request) {
   }
 
   const [questionsRes, audiencesRes, responsesRes] = await Promise.all([
-    supabase
+    admin
       .from('questions')
       .select('id, type, title, required, sort_order, options, validation, questionnaire_id')
       .eq('questionnaire_id', questionnaireId),
-    supabase
+    admin
       .from('questionnaire_audiences')
       .select('*, questionnaire_audience_score_ranges(*)')
       .eq('questionnaire_id', questionnaireId)
       .order('sort_order'),
-    supabase
+    admin
       .from('responses')
       .select('id, total_score, audience_id')
       .eq('questionnaire_id', questionnaireId),
   ]);
 
   const questions = (questionsRes.data ?? []) as Question[];
+
+  const questionIds = questions.map((q) => q.id);
+  const { data: scoringRulesData } = questionIds.length > 0
+    ? await admin
+        .from('scoring_rules')
+        .select('id, question_id, type, option_scores, ai_score_min, ai_score_max, ai_prompt')
+        .in('question_id', questionIds)
+    : { data: [] as ScoringRule[] };
+  const scoringRules = (scoringRulesData ?? []) as ScoringRule[];
 
   type AudienceRow = {
     id: string;
@@ -93,10 +110,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, updated: 0 });
   }
 
-  // One bulk read of all answers keyed by response id. Saves a round-trip
-  // per response at the cost of memory; fine for typical lead volumes.
   const responseIds = responses.map((r) => r.id);
-  const { data: answerRows } = await supabase
+  const { data: answerRows } = await admin
     .from('response_answers')
     .select('response_id, question_id, answer')
     .in('response_id', responseIds);
@@ -116,19 +131,25 @@ export async function POST(request: Request) {
   let updated = 0;
   for (const r of responses) {
     const answers = answersByResponse.get(r.id) ?? {};
+    const nextTotalScore = calculateTotalScore(questions, scoringRules, answers);
     const redFlagCount = countRedFlags(questions, answers);
     const nextAudienceId = assignAudience({
-      totalScore: r.total_score ?? 0,
+      totalScore: nextTotalScore,
       redFlagCount,
       redFlagThreshold: questionnaire.red_flag_threshold ?? null,
       redFlagAudienceId: questionnaire.red_flag_audience_id ?? null,
       audiences,
     });
-    if (nextAudienceId === r.audience_id) continue;
-    const { error } = await supabase
-      .from('responses')
-      .update({ audience_id: nextAudienceId })
-      .eq('id', r.id);
+
+    const scoreChanged = nextTotalScore !== r.total_score;
+    const audienceChanged = nextAudienceId !== r.audience_id;
+    if (!scoreChanged && !audienceChanged) continue;
+
+    const patch: Record<string, unknown> = {};
+    if (scoreChanged) patch.total_score = nextTotalScore;
+    if (audienceChanged) patch.audience_id = nextAudienceId;
+
+    const { error } = await admin.from('responses').update(patch).eq('id', r.id);
     if (!error) updated += 1;
   }
 

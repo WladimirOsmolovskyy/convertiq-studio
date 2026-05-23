@@ -40,6 +40,7 @@ import type {
 import { isCustomField, resolveLeadFields } from '@/lib/leadFields';
 import { buildLeadPayload } from '@/lib/leadPayload';
 import { assignAudience, countRedFlags } from '@/lib/audiences/assign';
+import { calculateTotalScore } from '@/lib/scoring';
 import ResultPageRenderer from '@/components/ResultPageRenderer';
 import { projectAnswers, type ResultRenderContext } from '@/lib/resultVariables';
 
@@ -189,24 +190,7 @@ export default function QuestionnaireRenderer({
   );
 
   const calculateScore = useCallback(
-    (src: AnswersMap) => {
-      let score = 0;
-      for (const q of questions) {
-        const rule = scoringRules.find((r) => r.question_id === q.id);
-        if (!rule) continue;
-        const ans = src[q.id];
-        if (!ans) continue;
-
-        if (rule.type === 'fixed' && hasOptions(q.type)) {
-          for (const optId of ans.selected_options || []) {
-            score += rule.option_scores?.[optId] ?? 0;
-          }
-        } else if (rule.type === 'fixed') {
-          score += rule.option_scores?.['_any'] ?? 0;
-        }
-      }
-      return score;
-    },
+    (src: AnswersMap) => calculateTotalScore(questions, scoringRules, src),
     [questions, scoringRules],
   );
 
