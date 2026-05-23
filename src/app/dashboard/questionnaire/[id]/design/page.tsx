@@ -385,7 +385,7 @@ export default function DesignEditor() {
         <div className={styles.designSection}>
           <SectionTitle>Background</SectionTitle>
           <div style={{ display: 'flex', gap: '0.375rem', marginBottom: '0.75rem' }}>
-            {(['solid', 'gradient'] as const).map((t) => (
+            {(['solid', 'gradient', 'image'] as const).map((t) => (
               <button key={t}
                 className={`btn btn-sm ${design.background.type === t ? 'btn-primary' : 'btn-ghost'}`}
                 onClick={() => updateDesign({
@@ -393,7 +393,9 @@ export default function DesignEditor() {
                     type: t,
                     value: t === 'gradient'
                       ? `linear-gradient(135deg, ${design.colors.background}, ${design.colors.primary})`
-                      : design.colors.background,
+                      : t === 'image'
+                        ? (design.background.type === 'image' ? design.background.value : '')
+                        : design.colors.background,
                   },
                 })}
               >
@@ -405,6 +407,48 @@ export default function DesignEditor() {
             <input className="input" value={design.background.value}
               onChange={(e) => updateDesign({ background: { ...design.background, value: e.target.value } })}
               placeholder="CSS gradient..." />
+          )}
+          {design.background.type === 'image' && (
+            <>
+              <input
+                className="input"
+                value={design.background.value}
+                onChange={(e) => updateDesign({ background: { ...design.background, value: e.target.value } })}
+                placeholder="Paste image URL..."
+                style={{ marginBottom: '0.5rem' }}
+              />
+              <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex' }}>
+                Upload image
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    const reader = new FileReader();
+                    reader.onload = () => updateDesign({
+                      background: { type: 'image', value: reader.result as string },
+                    });
+                    reader.readAsDataURL(f);
+                  }}
+                />
+              </label>
+              {design.background.value && (
+                <div
+                  aria-label="Background preview"
+                  style={{
+                    marginTop: '0.5rem',
+                    height: '80px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border)',
+                    backgroundImage: `url(${design.background.value})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }}
+                />
+              )}
+            </>
           )}
         </div>
 
