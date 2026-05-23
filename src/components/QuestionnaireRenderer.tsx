@@ -23,13 +23,14 @@
  *   `previewRestartBtn`, `previewRestartBtnLarge`.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { nanoid } from 'nanoid';
 import type {
   AnswersMap,
   Audience,
   DesignConfig,
+  ElementId,
   LeadField,
   Question,
   QuestionBranch,
@@ -63,9 +64,32 @@ export interface QuestionnaireRendererProps {
   /** Optional template-level lead fields. Public path loads them server-side
    *  and passes them in; preview omits them. */
   templateLeadFields?: LeadField[];
+  /** When true, addressable elements gain click-to-select behavior and
+   *  outline classes. The renderer also suppresses each element's normal
+   *  click action (e.g. a radio option won't auto-advance). Wired only by
+   *  the Design tab's preview pane. */
+  selectableMode?: boolean;
+  /** Currently selected element id from the inspector. Highlights the
+   *  matching element. */
+  selectedElementId?: ElementId | null;
+  /** Fired when the user clicks a selectable element in selectableMode. */
+  onSelectElement?: (id: ElementId) => void;
 }
 
 const hasOptions = (type: string) => ['radio', 'checkbox', 'dropdown'].includes(type);
+
+/** Convert sparse `design.elements[id]` overrides into inline CSS. Only the
+ *  fields wired in Commit C are emitted (fill, radius, padding); VarRefs are
+ *  ignored for now and will be resolved in phase 2. */
+function elementOverrideStyle(design: DesignConfig, id: ElementId): CSSProperties {
+  const o = design.elements?.[id];
+  if (!o) return {};
+  const s: CSSProperties = {};
+  if (typeof o.fill === 'string') s.background = o.fill;
+  if (typeof o.radius === 'number') s.borderRadius = `${o.radius}px`;
+  if (typeof o.padding === 'number') s.padding = `${o.padding}rem`;
+  return s;
+}
 
 export default function QuestionnaireRenderer({
   questionnaire,
@@ -78,8 +102,32 @@ export default function QuestionnaireRenderer({
   styles,
   mode = 'public',
   templateLeadFields,
+  selectableMode,
+  selectedElementId,
+  onSelectElement,
 }: QuestionnaireRendererProps) {
   const isPreview = mode === 'preview';
+
+  /**
+   * Build the className + onClick props for an addressable element.
+   * In selectableMode, original click handlers are SUPPRESSED — clicks
+   * select the element instead of triggering its UI behavior (so e.g.
+   * clicking a radio option in the editor doesn't auto-advance).
+   * Outside selectableMode this is a passthrough.
+   */
+  const interact = (id: ElementId, originalOnClick?: (e: React.MouseEvent) => void) => {
+    if (!selectableMode) {
+      return { className: '', onClick: originalOnClick };
+    }
+    return {
+      className: `${styles.selectable ?? ''} ${selectedElementId === id ? styles.canvasSelected ?? '' : ''}`.trim(),
+      onClick: (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onSelectElement?.(id);
+      },
+    };
+  };
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<AnswersMap>({});
@@ -450,9 +498,11 @@ export default function QuestionnaireRenderer({
     );
   }
 
+  const pageInteract = interact('page');
   return (
     <div
-      className={styles.page}
+      className={`${styles.page} ${pageInteract.className}`.trim()}
+      onClick={pageInteract.onClick}
       style={{
         background: getBackgroundCSS(),
         color: design.typography.body?.color ?? design.colors.text,
@@ -461,6 +511,7 @@ export default function QuestionnaireRenderer({
         fontWeight: design.typography.body?.weight ?? 400,
         lineHeight: design.typography.body?.lineHeight ?? design.typography.lineHeight,
         letterSpacing: `${design.typography.body?.letterSpacing ?? 0}em`,
+        ...elementOverrideStyle(design, 'page'),
       }}
     >
       {isPreview && (
@@ -487,42 +538,58 @@ export default function QuestionnaireRenderer({
         {!completed ? (
           <>
             {/* Progress */}
-            <div className={styles.progressWrap}>
-              <div className={styles.progressLabel} style={{ color: design.colors.textMuted }}>
-                <span>{questionnaire.title}</span>
-                <span>{showLeadCapture ? 100 : Math.round(progress)}%</span>
-              </div>
-              <div
-                className={styles.progressBar}
-                style={{
-                  background: design.components.progress.background,
-                  height: `${design.components.progress.height}px`,
-                }}
-              >
+            {(() => {
+              const sel = interact('progress');
+              return (
                 <div
-                  className={styles.progressFill}
-                  style={{
-                    width: `${showLeadCapture ? 100 : progress}%`,
-                    background: design.components.progress.fillColor,
-                  }}
-                />
-              </div>
-            </div>
+                  className={`${styles.progressWrap} ${sel.className}`.trim()}
+                  onClick={sel.onClick}
+                  style={elementOverrideStyle(design, 'progress')}
+                >
+                  <div className={styles.progressLabel} style={{ color: design.colors.textMuted }}>
+                    <span>{questionnaire.title}</span>
+                    <span>{showLeadCapture ? 100 : Math.round(progress)}%</span>
+                  </div>
+                  <div
+                    className={styles.progressBar}
+                    style={{
+                      background: design.components.progress.background,
+                      height: `${design.components.progress.height}px`,
+                    }}
+                  >
+                    <div
+                      className={styles.progressFill}
+                      style={{
+                        width: `${showLeadCapture ? 100 : progress}%`,
+                        background: design.components.progress.fillColor,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Lead-capture step */}
-            {showLeadCapture && (
+            {showLeadCapture && (() => {
+              const cardSel = interact('questionCard');
+              const titleSel = interact('questionTitle');
+              const descSel = interact('questionDescription');
+              return (
               <div
-                className={styles.questionWrap}
+                className={`${styles.questionWrap} ${cardSel.className}`.trim()}
+                onClick={cardSel.onClick}
                 style={{
                   background: design.components.question.background,
                   border: design.components.question.border,
                   boxShadow: design.components.question.shadow,
                   padding: design.components.question.padding,
                   borderRadius: `${design.layout.borderRadius}px`,
+                  ...elementOverrideStyle(design, 'questionCard'),
                 }}
               >
                 <h2
-                  className={styles.questionTitle}
+                  className={`${styles.questionTitle} ${titleSel.className}`.trim()}
+                  onClick={titleSel.onClick}
                   style={{
                     fontFamily: design.typography.headingFont,
                     fontWeight: design.typography.heading?.weight ?? design.typography.headingWeight,
@@ -530,13 +597,18 @@ export default function QuestionnaireRenderer({
                     lineHeight: design.typography.heading?.lineHeight ?? 1.2,
                     letterSpacing: `${design.typography.heading?.letterSpacing ?? -0.02}em`,
                     color: design.typography.heading?.color ?? design.colors.text,
+                    ...elementOverrideStyle(design, 'questionTitle'),
                   }}
                 >
                   Almost done
                 </h2>
                 <p
-                  className={styles.questionDescription}
-                  style={{ color: design.colors.textMuted }}
+                  className={`${styles.questionDescription} ${descSel.className}`.trim()}
+                  onClick={descSel.onClick}
+                  style={{
+                    color: design.colors.textMuted,
+                    ...elementOverrideStyle(design, 'questionDescription'),
+                  }}
                 >
                   Tell us a little about yourself to see your result.
                 </p>
@@ -600,12 +672,18 @@ export default function QuestionnaireRenderer({
                   )}
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Current Question */}
-            {currentQuestion && !showLeadCapture && (
+            {currentQuestion && !showLeadCapture && (() => {
+              const cardSel = interact('questionCard');
+              const titleSel = interact('questionTitle');
+              const descSel = interact('questionDescription');
+              return (
               <div
-                className={styles.questionWrap}
+                className={`${styles.questionWrap} ${cardSel.className}`.trim()}
+                onClick={cardSel.onClick}
                 key={currentQuestion.id}
                 style={{
                   background: design.components.question.background,
@@ -613,10 +691,12 @@ export default function QuestionnaireRenderer({
                   boxShadow: design.components.question.shadow,
                   padding: design.components.question.padding,
                   borderRadius: `${design.layout.borderRadius}px`,
+                  ...elementOverrideStyle(design, 'questionCard'),
                 }}
               >
                 <h2
-                  className={styles.questionTitle}
+                  className={`${styles.questionTitle} ${titleSel.className}`.trim()}
+                  onClick={titleSel.onClick}
                   style={{
                     fontFamily: design.typography.headingFont,
                     fontWeight: design.typography.heading?.weight ?? design.typography.headingWeight,
@@ -624,6 +704,7 @@ export default function QuestionnaireRenderer({
                     lineHeight: design.typography.heading?.lineHeight ?? 1.2,
                     letterSpacing: `${design.typography.heading?.letterSpacing ?? -0.02}em`,
                     color: design.typography.heading?.color ?? design.colors.text,
+                    ...elementOverrideStyle(design, 'questionTitle'),
                   }}
                 >
                   {currentQuestion.title}
@@ -632,8 +713,12 @@ export default function QuestionnaireRenderer({
 
                 {currentQuestion.description && (
                   <p
-                    className={styles.questionDescription}
-                    style={{ color: design.colors.textMuted }}
+                    className={`${styles.questionDescription} ${descSel.className}`.trim()}
+                    onClick={descSel.onClick}
+                    style={{
+                      color: design.colors.textMuted,
+                      ...elementOverrideStyle(design, 'questionDescription'),
+                    }}
                   >
                     {currentQuestion.description}
                   </p>
@@ -652,13 +737,15 @@ export default function QuestionnaireRenderer({
                         opt.id,
                       );
                       const isRadio = currentQuestion.type === 'radio';
+                      const optElementId: ElementId = isRadio ? 'radio.option' : 'checkbox.option';
+                      const optSel = interact(optElementId, () =>
+                        isRadio ? handleRadioSelect(opt.id) : handleOptionSelect(opt.id),
+                      );
                       return (
                         <button
                           key={opt.id}
-                          className={`${styles.optionButton} ${isSelected ? styles.selected : ''} ${isRadio ? styles.optionRadio : ''}`}
-                          onClick={() =>
-                            isRadio ? handleRadioSelect(opt.id) : handleOptionSelect(opt.id)
-                          }
+                          className={`${styles.optionButton} ${isSelected ? styles.selected : ''} ${isRadio ? styles.optionRadio : ''} ${optSel.className}`.trim()}
+                          onClick={optSel.onClick}
                           disabled={isRadio && submitting}
                           style={{
                             background: isSelected
@@ -669,6 +756,7 @@ export default function QuestionnaireRenderer({
                               : design.components.option.border,
                             borderRadius: `${design.layout.borderRadius * 0.6}px`,
                             color: design.colors.text,
+                            ...elementOverrideStyle(design, optElementId),
                           }}
                         >
                           {!isRadio && (
@@ -684,93 +772,121 @@ export default function QuestionnaireRenderer({
                   </div>
                 )}
 
-                {currentQuestion.type === 'text' && (
-                  <input
-                    className={styles.input}
-                    value={answers[currentQuestion.id]?.value || ''}
-                    onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
-                    placeholder="Type your answer..."
-                    style={{
-                      background: design.components.input.background,
-                      border: design.components.input.border,
-                      borderRadius: `${design.components.input.borderRadius}px`,
-                      color: design.colors.text,
-                    }}
-                  />
-                )}
+                {currentQuestion.type === 'text' && (() => {
+                  const sel = interact('text.input', (e: React.MouseEvent) => e.stopPropagation());
+                  return (
+                    <input
+                      className={`${styles.input} ${sel.className}`.trim()}
+                      onClick={sel.onClick}
+                      value={answers[currentQuestion.id]?.value || ''}
+                      onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
+                      placeholder="Type your answer..."
+                      style={{
+                        background: design.components.input.background,
+                        border: design.components.input.border,
+                        borderRadius: `${design.components.input.borderRadius}px`,
+                        color: design.colors.text,
+                        ...elementOverrideStyle(design, 'text.input'),
+                      }}
+                    />
+                  );
+                })()}
 
-                {currentQuestion.type === 'textarea' && (
-                  <textarea
-                    className={styles.textarea}
-                    value={answers[currentQuestion.id]?.value || ''}
-                    onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
-                    placeholder="Type your answer..."
-                    style={{
-                      background: design.components.input.background,
-                      border: design.components.input.border,
-                      borderRadius: `${design.components.input.borderRadius}px`,
-                      color: design.colors.text,
-                    }}
-                  />
-                )}
+                {currentQuestion.type === 'textarea' && (() => {
+                  const sel = interact('textarea.input', (e: React.MouseEvent) => e.stopPropagation());
+                  return (
+                    <textarea
+                      className={`${styles.textarea} ${sel.className}`.trim()}
+                      onClick={sel.onClick}
+                      value={answers[currentQuestion.id]?.value || ''}
+                      onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
+                      placeholder="Type your answer..."
+                      style={{
+                        background: design.components.input.background,
+                        border: design.components.input.border,
+                        borderRadius: `${design.components.input.borderRadius}px`,
+                        color: design.colors.text,
+                        ...elementOverrideStyle(design, 'textarea.input'),
+                      }}
+                    />
+                  );
+                })()}
 
-                {currentQuestion.type === 'number' && (
-                  <input
-                    type="number"
-                    className={styles.input}
-                    value={answers[currentQuestion.id]?.value || ''}
-                    onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
-                    placeholder="0"
-                    style={{
-                      background: design.components.input.background,
-                      border: design.components.input.border,
-                      borderRadius: `${design.components.input.borderRadius}px`,
-                      color: design.colors.text,
-                      maxWidth: '200px',
-                    }}
-                  />
-                )}
+                {currentQuestion.type === 'number' && (() => {
+                  const sel = interact('text.input', (e: React.MouseEvent) => e.stopPropagation());
+                  return (
+                    <input
+                      type="number"
+                      className={`${styles.input} ${sel.className}`.trim()}
+                      onClick={sel.onClick}
+                      value={answers[currentQuestion.id]?.value || ''}
+                      onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
+                      placeholder="0"
+                      style={{
+                        background: design.components.input.background,
+                        border: design.components.input.border,
+                        borderRadius: `${design.components.input.borderRadius}px`,
+                        color: design.colors.text,
+                        maxWidth: '200px',
+                        ...elementOverrideStyle(design, 'text.input'),
+                      }}
+                    />
+                  );
+                })()}
 
-                {currentQuestion.type === 'email' && (
-                  <input
-                    type="email"
-                    className={styles.input}
-                    value={answers[currentQuestion.id]?.value || ''}
-                    onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
-                    placeholder="email@example.com"
-                    style={{
-                      background: design.components.input.background,
-                      border: design.components.input.border,
-                      borderRadius: `${design.components.input.borderRadius}px`,
-                      color: design.colors.text,
-                    }}
-                  />
-                )}
+                {currentQuestion.type === 'email' && (() => {
+                  const sel = interact('text.input', (e: React.MouseEvent) => e.stopPropagation());
+                  return (
+                    <input
+                      type="email"
+                      className={`${styles.input} ${sel.className}`.trim()}
+                      onClick={sel.onClick}
+                      value={answers[currentQuestion.id]?.value || ''}
+                      onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
+                      placeholder="email@example.com"
+                      style={{
+                        background: design.components.input.background,
+                        border: design.components.input.border,
+                        borderRadius: `${design.components.input.borderRadius}px`,
+                        color: design.colors.text,
+                        ...elementOverrideStyle(design, 'text.input'),
+                      }}
+                    />
+                  );
+                })()}
 
-                {currentQuestion.type === 'rating' && (
-                  <div className={styles.ratingStars}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        className={styles.ratingStar}
-                        onClick={() => {
-                          setRating(star);
-                          handleAnswer(currentQuestion.id, { value: String(star) });
-                        }}
-                        style={{
-                          color:
-                            star <= (Number(answers[currentQuestion.id]?.value) || 0)
-                              ? design.colors.accent
-                              : design.colors.textMuted,
-                        }}
-                      >
-                        {star <= (Number(answers[currentQuestion.id]?.value) || 0) ? '★' : '☆'}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {currentQuestion.type === 'rating' && (() => {
+                  const sel = interact('rating.starsContainer');
+                  return (
+                    <div
+                      className={`${styles.ratingStars} ${sel.className}`.trim()}
+                      onClick={sel.onClick}
+                      style={elementOverrideStyle(design, 'rating.starsContainer')}
+                    >
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          className={styles.ratingStar}
+                          onClick={() => {
+                            setRating(star);
+                            handleAnswer(currentQuestion.id, { value: String(star) });
+                          }}
+                          style={{
+                            color:
+                              star <= (Number(answers[currentQuestion.id]?.value) || 0)
+                                ? design.colors.accent
+                                : design.colors.textMuted,
+                          }}
+                        >
+                          {star <= (Number(answers[currentQuestion.id]?.value) || 0) ? '★' : '☆'}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
-            )}
+              );
+            })()}
 
             {/* Navigation */}
             <div className={styles.navButtons}>
@@ -791,31 +907,35 @@ export default function QuestionnaireRenderer({
               </button>
               {/* Radio questions auto-advance on click — Next button is redundant
                   there. Keep it for every other input type and the lead-capture step. */}
-              {(showLeadCapture || currentQuestion?.type !== 'radio') && (
-                <button
-                  className={styles.navBtn}
-                  onClick={showLeadCapture ? handleLeadCaptureSubmit : handleNext}
-                  disabled={(!showLeadCapture && !canProceed) || submitting}
-                  style={{
-                    background: design.components.button.background,
-                    color: design.components.button.color,
-                    borderRadius: `${design.components.button.borderRadius}px`,
-                    padding: design.components.button.padding,
-                    fontSize: `${design.components.button.fontSize}px`,
-                    opacity: !showLeadCapture && !canProceed ? 0.5 : 1,
-                  }}
-                >
-                  {submitting
-                    ? 'Submitting...'
-                    : showLeadCapture
-                      ? 'Submit'
-                      : getNextQuestionIndex(currentIndex, answers) === -1
-                        ? customLeadFields.length > 0
-                          ? 'Continue'
-                          : 'Submit'
-                        : 'Next'}
-                </button>
-              )}
+              {(showLeadCapture || currentQuestion?.type !== 'radio') && (() => {
+                const sel = interact('button', showLeadCapture ? handleLeadCaptureSubmit : handleNext);
+                return (
+                  <button
+                    className={`${styles.navBtn} ${sel.className}`.trim()}
+                    onClick={sel.onClick}
+                    disabled={(!showLeadCapture && !canProceed) || submitting}
+                    style={{
+                      background: design.components.button.background,
+                      color: design.components.button.color,
+                      borderRadius: `${design.components.button.borderRadius}px`,
+                      padding: design.components.button.padding,
+                      fontSize: `${design.components.button.fontSize}px`,
+                      opacity: !showLeadCapture && !canProceed ? 0.5 : 1,
+                      ...elementOverrideStyle(design, 'button'),
+                    }}
+                  >
+                    {submitting
+                      ? 'Submitting...'
+                      : showLeadCapture
+                        ? 'Submit'
+                        : getNextQuestionIndex(currentIndex, answers) === -1
+                          ? customLeadFields.length > 0
+                            ? 'Continue'
+                            : 'Submit'
+                          : 'Next'}
+                  </button>
+                );
+              })()}
             </div>
           </>
         ) : (

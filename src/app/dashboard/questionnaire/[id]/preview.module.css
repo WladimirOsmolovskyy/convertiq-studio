@@ -317,3 +317,22 @@
   margin: 0 auto;
   line-height: 1.7;
 }
+
+/* ─── Canvas selection (design tab only) ────────────────────────
+ *  Applied to addressable elements when the renderer runs in
+ *  `selectableMode`. Outline (not border) keeps layout stable. */
+.selectable {
+  cursor: pointer;
+  outline: 1px dashed transparent;
+  outline-offset: 2px;
+  transition: outline-color var(--duration-fast) var(--ease-out);
+}
+.selectable:hover {
+  outline-color: var(--accent, #007aff);
+  outline-style: dashed;
+}
+.canvasSelected,
+.canvasSelected:hover {
+  outline: 2px solid var(--accent, #007aff);
+  outline-offset: 2px;
+}
