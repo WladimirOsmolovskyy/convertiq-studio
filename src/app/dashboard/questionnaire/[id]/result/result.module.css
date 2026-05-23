@@ -385,19 +385,6 @@
   min-height: 0;
 }
 
-/** Wrap around the live rendered page so we can layer click handlers
- *  and selection outlines on top without disturbing the page's own
- *  flex layout. */
-.canvasFrame {
-  width: 100%;
-  max-width: 720px;
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  overflow: hidden;
-  position: relative;
-}
-
 /** Wrapper that captures clicks on individual nodes. Uses outline
  *  (not border) so it doesn't reflow the page when toggled. */
 .nodeHit {
@@ -746,6 +733,458 @@
   text-align: center;
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+/* ─── Image dropzone (inspector) ─────────────────────────────────── */
+.imageDropzone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 120px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+.imageDropzone:hover,
+.imageDropzoneOver {
+  border-color: var(--accent);
+  background: var(--fill-quaternary);
+}
+.imageDropzoneHasImage {
+  border-style: solid;
+  background: var(--surface);
+}
+.imageDropzonePreview {
+  display: block;
+  max-width: 100%;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+.imageDropzoneEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1rem;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+.imageDropzoneHint {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+.imageDropzoneOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.imageDropzoneError {
+  margin-top: 4px;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  color: var(--error);
+  background: var(--error-muted, rgba(255, 59, 48, 0.08));
+  border-radius: var(--radius-sm);
+}
+.spin {
+  animation: result-spin 0.9s linear infinite;
+}
+@keyframes result-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Framer-style inspector sections ──────────────────────────── */
+
+/** Section card. Header is a button (toggles open). Body inset 0. */
+.section {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--separator);
+}
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0.875rem 1rem 0.5rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.sectionTitle {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+.sectionToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+.sectionHeader:hover .sectionToggle {
+  color: var(--text);
+  background: var(--fill-quaternary);
+}
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.125rem 1rem 0.875rem;
+}
+
+/* ─── Property row (label on left, value on right) ──────────────── */
+.propRow {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 28px;
+}
+.propLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.propLeadPlus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+  border-radius: 50%;
+}
+.propValue {
+  display: flex;
+  min-width: 0;
+}
+.propValue > * {
+  flex: 1;
+  min-width: 0;
+}
+.propPlaceholder {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 0.5rem 0;
+  font-style: italic;
+}
+.dimHint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+.toLabel {
+  flex: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+
+/* ─── Full-width inputs used inside prop values ─────────────────── */
+.fwInput {
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  box-sizing: border-box;
+}
+.fwInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.fwInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ─── Segmented control (text labels) ───────────────────────────── */
+.segCtl {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--fill-quaternary);
+  border-radius: var(--radius-md);
+  width: 100%;
+}
+.segCtlBtn {
+  flex: 1;
+  padding: 0.3125rem 0.375rem;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.segCtlBtnActive {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ─── Icon-only segmented control ───────────────────────────────── */
+.iconSeg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--fill-quaternary);
+  border-radius: var(--radius-md);
+  width: 100%;
+}
+.iconSegBtn {
+  flex: 1;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.iconSegBtn:hover {
+  color: var(--text);
+}
+.iconSegBtnActive {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ─── Dropdown stub (Framer-style chip) ─────────────────────────── */
+.dropdownStub {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.dropdownStub:hover {
+  border-color: var(--border-hover, var(--accent));
+}
+.dropdownStubSelect {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ─── Number + slider combo ─────────────────────────────────────── */
+.numberSlider {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 0.375rem;
+  align-items: center;
+  width: 100%;
+}
+.numberSliderNum {
+  padding: 0.375rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  box-sizing: border-box;
+  width: 100%;
+}
+.numberSliderNum:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.numberSliderRange {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* ─── Number stepper (number + −/+ buttons) ────────────────────── */
+.numberStepper {
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  gap: 0.375rem;
+  align-items: stretch;
+  width: 100%;
+}
+.numberStepperBtns {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.numberStepperBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+.numberStepperBtn:hover { color: var(--text); }
+.numberStepperSep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+}
+
+/* ─── Color field (swatch + text input) ─────────────────────────── */
+.colorField {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 3px 6px 3px 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.colorField:focus-within {
+  border-color: var(--accent);
+}
+.colorSwatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--fill-quaternary);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.colorFieldInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.8125rem;
+  padding: 0.25rem 0;
+  min-width: 0;
+}
+.colorFieldInput:focus { outline: none; }
+.colorFieldInput::placeholder { color: var(--text-muted); }
+
+/* ─── Size row (value + mode selector) ──────────────────────────── */
+.sizeRow {
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  gap: 0.375rem;
+  width: 100%;
+}
+.sizeRowValue {
+  width: 100%;
+}
+.sizeRowMode {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.sizeRowMode select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ─── Padding / Radius controls ────────────────────────────────── */
+.paddingCtl {
+  display: grid;
+  grid-template-columns: 1fr 30px 30px;
+  gap: 0.25rem;
+  width: 100%;
+}
+.paddingCtlGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) 30px;
+  gap: 0.25rem;
+  width: 100%;
+}
+.paddingLinkBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 100%;
+  height: 28px;
+}
+.paddingLinkBtn:hover {
+  color: var(--text);
+}
+.paddingLinkBtnActive {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--text-secondary);
+}
+
+/* ─── Top alignment icon strip ─────────────────────────────────── */
+.alignRow {
+  display: flex;
+  gap: 2px;
+  padding: 0.625rem 0.875rem 0.375rem;
+  border-bottom: 1px solid var(--separator);
+}
+.alignBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.alignBtn:hover {
+  background: var(--fill-quaternary);
+  color: var(--text);
 }
 
 /* ─── Variable reference list ───────────────────────────────────── */

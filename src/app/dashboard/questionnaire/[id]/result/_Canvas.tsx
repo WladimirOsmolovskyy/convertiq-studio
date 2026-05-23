@@ -138,15 +138,13 @@ export default function Canvas({ page, selectedNodeId, onSelectNode }: Props) {
       </div>
 
       <div className={styles.canvasStage} onClick={() => onSelectNode(null)}>
-        <div className={styles.canvasFrame} onClick={(e) => e.stopPropagation()}>
-          <ResultPageRenderer
-            page={page}
-            ctx={sampleCtx}
-            design={design}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={onSelectNode}
-          />
-        </div>
+        <ResultPageRenderer
+          page={page}
+          ctx={sampleCtx}
+          design={design}
+          selectedNodeId={selectedNodeId}
+          onSelectNode={onSelectNode}
+        />
       </div>
     </div>
   );
