@@ -45,6 +45,11 @@ interface QuestionnaireState {
   isDirty: boolean;
   isSaving: boolean;
   saveStatus: SaveStatus;
+  /** Flipped on by any mutation that affects audience assignment
+   *  (red-flag option toggle, audience CRUD, range CRUD, red-flag rule
+   *  edits). Read once at the end of saveAll to decide whether to fire
+   *  the recompute endpoint for existing responses. Reset on save. */
+  audienceConfigDirty: boolean;
 
   setQuestionnaire: (q: Questionnaire) => void;
   setQuestions: (q: Question[]) => void;
@@ -124,6 +129,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
   isDirty: false,
   isSaving: false,
   saveStatus: 'idle' as SaveStatus,
+  audienceConfigDirty: false,
 
   setQuestionnaire: (q) => set({ questionnaire: q }),
   setQuestions: (q) => set({ questions: q, isDirty: true }),
@@ -243,6 +249,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
         };
       }),
       isDirty: true,
+      audienceConfigDirty: true,
     }),
 
   removeOption: (qId, oId) =>
@@ -426,6 +433,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
         },
       ],
       isDirty: true,
+      audienceConfigDirty: true,
     });
   },
 
@@ -433,6 +441,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
     set({
       audiences: get().audiences.map((a) => (a.id === id ? { ...a, ...updates } : a)),
       isDirty: true,
+      audienceConfigDirty: true,
     }),
 
   removeAudience: (id) => {
@@ -442,6 +451,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
       questionnaire:
         q && q.red_flag_audience_id === id ? { ...q, red_flag_audience_id: null } : q,
       isDirty: true,
+      audienceConfigDirty: true,
     });
   },
 
@@ -449,7 +459,11 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
     const list = [...get().audiences];
     const [moved] = list.splice(from, 1);
     list.splice(to, 0, moved);
-    set({ audiences: list.map((a, i) => ({ ...a, sort_order: i })), isDirty: true });
+    set({
+      audiences: list.map((a, i) => ({ ...a, sort_order: i })),
+      isDirty: true,
+      audienceConfigDirty: true,
+    });
   },
 
   addAudienceRange: (audienceId) =>
@@ -471,6 +485,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
         };
       }),
       isDirty: true,
+      audienceConfigDirty: true,
     }),
 
   updateAudienceRange: (audienceId, rangeId, updates) =>
@@ -483,6 +498,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
         };
       }),
       isDirty: true,
+      audienceConfigDirty: true,
     }),
 
   removeAudienceRange: (audienceId, rangeId) =>
@@ -497,29 +513,46 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
         };
       }),
       isDirty: true,
+      audienceConfigDirty: true,
     }),
 
   setRedFlagThreshold: (threshold) => {
     const q = get().questionnaire;
     if (!q) return;
-    set({ questionnaire: { ...q, red_flag_threshold: threshold }, isDirty: true });
+    set({
+      questionnaire: { ...q, red_flag_threshold: threshold },
+      isDirty: true,
+      audienceConfigDirty: true,
+    });
   },
 
   setRedFlagAudience: (audienceId) => {
     const q = get().questionnaire;
     if (!q) return;
-    set({ questionnaire: { ...q, red_flag_audience_id: audienceId }, isDirty: true });
+    set({
+      questionnaire: { ...q, red_flag_audience_id: audienceId },
+      isDirty: true,
+      audienceConfigDirty: true,
+    });
   },
 
-  hydrate: (data) => set({ ...data, isDirty: false, isSaving: false, saveStatus: 'idle' }),
+  hydrate: (data) =>
+    set({
+      ...data,
+      isDirty: false,
+      isSaving: false,
+      saveStatus: 'idle',
+      audienceConfigDirty: false,
+    }),
 
   reset: () =>
-    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], resultPages: [], design: defaultDesign, audiences: [], isDirty: false, isSaving: false, saveStatus: 'idle' }),
+    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], resultPages: [], design: defaultDesign, audiences: [], isDirty: false, isSaving: false, saveStatus: 'idle', audienceConfigDirty: false }),
 
   saveAll: async () => {
     // Read fresh state on each call so we always persist the latest store.
     const s = get();
     if (!s.questionnaire || s.isSaving) return;
+    const shouldRecomputeAudiences = s.audienceConfigDirty;
     set({ isSaving: true, saveStatus: 'saving' });
 
     try {
@@ -713,7 +746,19 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
         }
       }
 
-      set({ isDirty: false, isSaving: false, saveStatus: 'saved' });
+      set({ isDirty: false, isSaving: false, saveStatus: 'saved', audienceConfigDirty: false });
+
+      // Fire-and-forget: recompute audience_id on every existing
+      // response so leads stay in the bucket the latest config dictates.
+      // Scoped to changes that actually affect assignment (red-flag
+      // toggles, audience CRUD, range CRUD, red-flag rule edits).
+      if (shouldRecomputeAudiences) {
+        void fetch('/api/audiences/recompute', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ questionnaire_id: qId }),
+        }).catch(() => {});
+      }
 
       // Drop the "Saved" indicator back to idle after 3s.
       setTimeout(() => {
