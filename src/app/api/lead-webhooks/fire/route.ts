@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { deliverToWebhooks } from '@/lib/webhooks/deliver';
+import { deliverToGhl } from '@/lib/integrations/ghl/deliver';
 import type { LeadPayload } from '@/lib/leadPayload';
 
 // Public endpoint — called by the questionnaire renderer right after a
@@ -45,9 +46,14 @@ export async function POST(request: Request) {
     questionnaire: { ...payload.questionnaire, id: response.questionnaire_id },
   };
 
-  // Fire-and-forget for the caller; we still await so per-destination
-  // log rows are written before the response returns (lightweight).
-  await deliverToWebhooks(response.questionnaire_id, stamped);
+  // Fan out to every configured destination for this questionnaire.
+  // We await so per-destination log rows are written before the
+  // response returns; allSettled so one failing provider doesn't
+  // block the others.
+  await Promise.allSettled([
+    deliverToWebhooks(response.questionnaire_id, stamped),
+    deliverToGhl(response.questionnaire_id, stamped),
+  ]);
 
   return NextResponse.json({ ok: true });
 }
