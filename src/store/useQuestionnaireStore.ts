@@ -1,6 +1,22 @@
 import { create } from 'zustand';
-import type { Question, QuestionBranch, ScoringRule, ResultPage, DesignConfig, Questionnaire, LeadField } from '@/lib/types';
+import type {
+  Question,
+  QuestionBranch,
+  ScoringRule,
+  ResultPage,
+  ResultNode,
+  DesignConfig,
+  Questionnaire,
+  LeadField,
+} from '@/lib/types';
 import { defaultDesign, defaultResultPageContent } from '@/lib/types';
+import {
+  appendChild,
+  deleteNode,
+  moveNodeToFrame,
+  moveNodeWithinParent,
+  patchNode,
+} from '@/lib/resultPage';
 import { createClient } from '@/lib/supabase/client';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -37,6 +53,17 @@ interface QuestionnaireState {
   addResultPage: () => void;
   updateResultPage: (id: string, updates: Partial<ResultPage>) => void;
   removeResultPage: (id: string) => void;
+  /** Mutate a single node in the page's content tree. */
+  updateResultPageNode: (pageId: string, nodeId: string, patch: Partial<ResultNode>) => void;
+  /** Append a node as the last child of the given parent frame. */
+  addResultPageNode: (pageId: string, parentNodeId: string, node: ResultNode) => void;
+  /** Remove a node by id (root cannot be removed). */
+  removeResultPageNode: (pageId: string, nodeId: string) => void;
+  /** Swap a node with its prev/next sibling. No-op at edges. */
+  moveResultPageNode: (pageId: string, nodeId: string, direction: 'up' | 'down') => void;
+  /** Reparent a node to be the last child of `parentNodeId`. No-op for
+   *  cycles or invalid targets. */
+  moveResultPageNodeTo: (pageId: string, nodeId: string, parentNodeId: string) => void;
   updateTitle: (title: string) => void;
   updateSlug: (slug: string) => void;
   setDomain: (domainId: string | null) => void;
@@ -229,6 +256,50 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
 
   removeResultPage: (id) =>
     set({ resultPages: get().resultPages.filter((r) => r.id !== id), isDirty: true }),
+
+  updateResultPageNode: (pageId, nodeId, patch) =>
+    set({
+      resultPages: get().resultPages.map((p) =>
+        p.id === pageId ? { ...p, content: patchNode(p.content, nodeId, patch) } : p,
+      ),
+      isDirty: true,
+    }),
+
+  addResultPageNode: (pageId, parentNodeId, node) =>
+    set({
+      resultPages: get().resultPages.map((p) =>
+        p.id === pageId ? { ...p, content: appendChild(p.content, parentNodeId, node) } : p,
+      ),
+      isDirty: true,
+    }),
+
+  removeResultPageNode: (pageId, nodeId) =>
+    set({
+      resultPages: get().resultPages.map((p) =>
+        p.id === pageId ? { ...p, content: deleteNode(p.content, nodeId) } : p,
+      ),
+      isDirty: true,
+    }),
+
+  moveResultPageNode: (pageId, nodeId, direction) =>
+    set({
+      resultPages: get().resultPages.map((p) =>
+        p.id === pageId
+          ? { ...p, content: moveNodeWithinParent(p.content, nodeId, direction) }
+          : p,
+      ),
+      isDirty: true,
+    }),
+
+  moveResultPageNodeTo: (pageId, nodeId, parentNodeId) =>
+    set({
+      resultPages: get().resultPages.map((p) =>
+        p.id === pageId
+          ? { ...p, content: moveNodeToFrame(p.content, nodeId, parentNodeId) }
+          : p,
+      ),
+      isDirty: true,
+    }),
 
   updateTitle: (title) => {
     const q = get().questionnaire;

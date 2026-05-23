@@ -1,96 +1,91 @@
 'use client';
 
 /**
- * Result pages tab. End-users land on one of these pages after completing
- * the questionnaire — chosen by which page's score range contains their
- * total score.
+ * Result tab shell. Three columns:
+ *   - left:   page list (selects which result page to edit)
+ *   - center: live canvas with click-to-select + add-block toolbar
+ *   - right:  inspector (page or node properties, plus variable reference)
  *
- * Step 1 scope: list pages, edit name + score range + sort order. Full
- * block authoring (text/image/frame autolayout + variable chips) lands in
- * the next step.
+ * Selection state is local to this shell. Page content + score-range
+ * metadata lives in the Zustand store, picked up by the canvas/inspector.
  */
 
+import { useMemo, useState } from 'react';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
-import { Flag, Plus, X } from 'lucide-react';
-import styles from '../editor.module.css';
+import PageList from './_PageList';
+import LayersPanel from './_LayersPanel';
+import Canvas from './_Canvas';
+import Inspector from './_Inspector';
+import styles from './result.module.css';
 
 export default function ResultEditor() {
-  const { resultPages, addResultPage, updateResultPage, removeResultPage } = useQuestionnaireStore();
+  const { resultPages } = useQuestionnaireStore();
+  // The user's explicit selection. May be stale (page deleted) — we never
+  // mutate it from an effect; instead the effective id is derived below.
+  const [explicitSelectedPageId, setExplicitSelectedPageId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  // Effective selection: honor the explicit pick if it still exists,
+  // otherwise default to the first page (or null when the list is empty).
+  const selectedPageId = useMemo(() => {
+    if (explicitSelectedPageId && resultPages.some((p) => p.id === explicitSelectedPageId)) {
+      return explicitSelectedPageId;
+    }
+    return resultPages[0]?.id ?? null;
+  }, [explicitSelectedPageId, resultPages]);
+
+  const selectedPage = useMemo(
+    () => resultPages.find((p) => p.id === selectedPageId) ?? null,
+    [resultPages, selectedPageId],
+  );
+
+  const handleSelectPage = (id: string | null) => {
+    setExplicitSelectedPageId(id);
+    setSelectedNodeId(null);
+  };
 
   return (
-    <div className={styles.editorPanel}>
-      <div style={{ maxWidth: '720px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.75rem', gap: '1rem' }}>
-          <div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.25rem', letterSpacing: '-0.018em' }}>Result Pages</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9375rem', letterSpacing: '-0.008em' }}>
-              Define what end-users see after finishing the questionnaire. The page whose score range contains their total score is shown.
-            </p>
-          </div>
-          <button className="btn btn-secondary btn-sm" onClick={addResultPage} style={{ flexShrink: 0 }}>
-            <Plus size={12} strokeWidth={2.25} /> Add Page
-          </button>
-        </div>
-
-        {resultPages.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-            <div style={{
-              width: 56, height: 56, margin: '0 auto 1rem',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              borderRadius: 'var(--radius-xl)', background: 'var(--fill-quaternary)',
-            }}>
-              <Flag size={28} strokeWidth={1.5} />
-            </div>
-            <p style={{ fontSize: '0.9375rem', marginBottom: '1rem' }}>
-              No result pages yet. Without one, end-users see a generic thank-you screen.
-            </p>
-            <button className="btn btn-primary btn-sm" onClick={addResultPage}>
-              <Plus size={12} strokeWidth={2.25} /> Create first page
-            </button>
-          </div>
-        ) : (
-          resultPages.map((page) => (
-            <div key={page.id} className={styles.resultCard}>
-              <div className={styles.resultRange}>
-                <input
-                  className="input"
-                  value={page.name}
-                  onChange={(e) => updateResultPage(page.id, { name: e.target.value })}
-                  placeholder="Internal name (e.g. 'High scorers')"
-                  style={{ flex: 1, minWidth: '160px' }}
-                />
-                <button
-                  className={styles.removeBtn}
-                  onClick={() => removeResultPage(page.id)}
-                  aria-label="Remove page"
-                >
-                  <X size={14} strokeWidth={2} />
-                </button>
-              </div>
-              <div className={styles.resultRange}>
-                <span className={styles.rangeLabel}>Score from</span>
-                <input
-                  type="number"
-                  className={styles.scoreInput}
-                  value={page.min_score}
-                  onChange={(e) => updateResultPage(page.id, { min_score: Number(e.target.value) })}
-                />
-                <span className={styles.rangeLabel}>to</span>
-                <input
-                  type="number"
-                  className={styles.scoreInput}
-                  value={page.max_score}
-                  onChange={(e) => updateResultPage(page.id, { max_score: Number(e.target.value) })}
-                />
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>points</span>
-              </div>
-              <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                Block authoring (text, images, layout, variables) — coming next.
-              </div>
-            </div>
-          ))
+    <div className={styles.editor}>
+      <div className={styles.leftRail}>
+        <PageList
+          pages={resultPages}
+          selectedPageId={selectedPageId}
+          onSelect={handleSelectPage}
+        />
+        {selectedPage && (
+          <LayersPanel
+            page={selectedPage}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+          />
         )}
       </div>
+
+      {selectedPage ? (
+        <Canvas
+          page={selectedPage}
+          selectedNodeId={selectedNodeId}
+          onSelectNode={setSelectedNodeId}
+        />
+      ) : (
+        <div className={styles.canvas}>
+          <div className={styles.canvasEmpty}>
+            {resultPages.length === 0
+              ? 'Create a result page from the left rail to start designing.'
+              : 'Select a page to edit.'}
+          </div>
+        </div>
+      )}
+
+      {selectedPage ? (
+        <Inspector page={selectedPage} selectedNodeId={selectedNodeId} />
+      ) : (
+        <aside className={styles.inspector}>
+          <div className={styles.inspectorEmpty}>
+            Properties will appear here once you select a page.
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

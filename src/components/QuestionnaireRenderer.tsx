@@ -27,6 +27,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { nanoid } from 'nanoid';
 import type {
+  AnswersMap,
   DesignConfig,
   LeadField,
   Question,
@@ -37,10 +38,10 @@ import type {
 } from '@/lib/types';
 import { isCustomField, resolveLeadFields } from '@/lib/leadFields';
 import { buildLeadPayload } from '@/lib/leadPayload';
-import { deriveTitleDescription } from '@/lib/resultPage';
+import ResultPageRenderer from '@/components/ResultPageRenderer';
+import { projectAnswers, type ResultRenderContext } from '@/lib/resultVariables';
 
 type StylesMap = Record<string, string>;
-type AnswersMap = Record<string, { value?: string; selected_options?: string[] }>;
 
 export interface QuestionnaireRendererProps {
   questionnaire: Questionnaire;
@@ -96,6 +97,30 @@ export default function QuestionnaireRenderer({
     () => effectiveLeadFields.filter(isCustomField),
     [effectiveLeadFields],
   );
+
+  /** Aggregated lead-field values from all sources (URL params, custom
+   *  inputs, and answers bound by `kind='question'` fields). Used both for
+   *  webhook persistence in submitAndFinish and for variable resolution
+   *  when rendering the result page. */
+  const leadFieldValues = useMemo(() => {
+    const values: Record<string, string> = { ...capturedFields };
+    for (const [id, v] of Object.entries(customFieldValues)) {
+      const trimmed = v.trim();
+      if (trimmed) values[id] = trimmed;
+    }
+    for (const f of effectiveLeadFields) {
+      if (f.kind !== 'question' || !f.questionId) continue;
+      const ans = answers[f.questionId];
+      if (!ans) continue;
+      const value =
+        ans.value ??
+        (ans.selected_options && ans.selected_options.length > 0
+          ? ans.selected_options.join(', ')
+          : null);
+      if (value) values[f.id] = value;
+    }
+    return values;
+  }, [capturedFields, customFieldValues, effectiveLeadFields, answers]);
 
   // Capture URL-kind fields on mount (public only — preview ignores URL params).
   useEffect(() => {
@@ -277,10 +302,13 @@ export default function QuestionnaireRenderer({
     const matched = resultPages.find((r) => score >= r.min_score && score <= r.max_score);
     setMatchedPage(matched || null);
 
-    const leadFieldValues: Record<string, string> = { ...capturedFields };
+    // Rebuild lead-field values against `finalAnswers` rather than the
+    // memoized snapshot — submitAndFinish may be called with a fresher
+    // answers map than what's in state right now.
+    const submitLeadFieldValues: Record<string, string> = { ...capturedFields };
     for (const [id, v] of Object.entries(customFieldValues)) {
       const trimmed = v.trim();
-      if (trimmed) leadFieldValues[id] = trimmed;
+      if (trimmed) submitLeadFieldValues[id] = trimmed;
     }
     for (const f of effectiveLeadFields) {
       if (f.kind !== 'question' || !f.questionId) continue;
@@ -291,7 +319,7 @@ export default function QuestionnaireRenderer({
         (ans.selected_options && ans.selected_options.length > 0
           ? ans.selected_options.join(', ')
           : null);
-      if (value) leadFieldValues[f.id] = value;
+      if (value) submitLeadFieldValues[f.id] = value;
     }
 
     if (!isPreview) {
@@ -313,7 +341,7 @@ export default function QuestionnaireRenderer({
           templateLeadFields,
           questions,
           answers: finalAnswers,
-          leadFieldValues,
+          leadFieldValues: submitLeadFieldValues,
           scoringRules,
         });
 
@@ -327,7 +355,7 @@ export default function QuestionnaireRenderer({
           metadata: {
             user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
             host: typeof window !== 'undefined' ? window.location.hostname : null,
-            lead_fields: leadFieldValues,
+            lead_fields: submitLeadFieldValues,
           },
         });
 
@@ -770,51 +798,41 @@ export default function QuestionnaireRenderer({
             </div>
           </>
         ) : (
-          /* Results — derived from the matched ResultPage's content blocks.
-             Block-tree rendering with variable interpolation lands in the
-             next step; for now we project the seeded text nodes back into
-             a title + description. */
+          /* Results — render the matched ResultPage's authored content
+             tree, with all variable spans resolved against the visitor's
+             score + answers + lead-field values. */
           (() => {
-            const derived = matchedPage ? deriveTitleDescription(matchedPage) : null;
+            const resultCtx: ResultRenderContext = {
+              score: totalScore,
+              page: matchedPage,
+              answers: projectAnswers(questions, answers),
+              leadFields: leadFieldValues,
+            };
             return (
               <div className={styles.resultsPage}>
-                <div className={styles.resultsIcon}>🎉</div>
-                <h1
-                  className={styles.resultsTitle}
-                  style={{
-                    fontFamily: design.typography.headingFont,
-                    fontWeight: design.typography.heading?.weight ?? design.typography.headingWeight,
-                    letterSpacing: `${design.typography.heading?.letterSpacing ?? -0.02}em`,
-                    color: design.typography.heading?.color ?? design.colors.text,
-                  }}
-                >
-                  {derived?.title || 'Thank you!'}
-                </h1>
-
-                <div
-                  className={styles.resultsScore}
-                  style={{
-                    background: design.components.option.selectedBackground,
-                    color: design.colors.accent,
-                  }}
-                >
-                  Score: {totalScore}
-                </div>
-
-                {derived && derived.description ? (
-                  <p
-                    className={styles.resultsDescription}
-                    style={{ color: design.colors.textMuted }}
-                  >
-                    {derived.description}
-                  </p>
+                {matchedPage ? (
+                  <ResultPageRenderer page={matchedPage} ctx={resultCtx} design={design} />
                 ) : (
-                  <p
-                    className={styles.resultsDescription}
-                    style={{ color: design.colors.textMuted }}
-                  >
-                    Your responses have been recorded. Thank you for completing the questionnaire!
-                  </p>
+                  /* No score range matched — minimal fallback. */
+                  <>
+                    <h1
+                      className={styles.resultsTitle}
+                      style={{
+                        fontFamily: design.typography.headingFont,
+                        fontWeight: design.typography.heading?.weight ?? design.typography.headingWeight,
+                        letterSpacing: `${design.typography.heading?.letterSpacing ?? -0.02}em`,
+                        color: design.typography.heading?.color ?? design.colors.text,
+                      }}
+                    >
+                      Thank you!
+                    </h1>
+                    <p
+                      className={styles.resultsDescription}
+                      style={{ color: design.colors.textMuted }}
+                    >
+                      Your responses have been recorded.
+                    </p>
+                  </>
                 )}
 
                 {isPreview && (

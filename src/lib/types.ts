@@ -65,6 +65,11 @@ export interface ScoringRule {
   ai_prompt: string;
 }
 
+/** Runtime answer map collected from the visitor as they progress through
+ *  the questionnaire. Keyed by question id. Either `value` (free text /
+ *  number / rating) or `selected_options` (radio/checkbox/dropdown) is set. */
+export type AnswersMap = Record<string, { value?: string; selected_options?: string[] }>;
+
 /* ─── Result Pages ──────────────────────────────────────────────── */
 
 /** A span inside a TextNode. Either literal text or a variable reference
@@ -162,6 +167,92 @@ export function defaultResultPageContent(): ResultFrameNode {
     justify: 'start',
     children: [],
   };
+}
+
+/* ─── Block factories ──────────────────────────────────────────────
+ * Used by the Result tab "Add block" menu. Each factory returns a
+ * fresh node with a new id and sensible defaults. Visual presets
+ * (title, subtitle, nav-with-logo) are typed nodes pre-styled — they
+ * aren't a separate node type, just convenience wrappers. */
+
+export function newFrameNode(overrides: Partial<ResultFrameNode> = {}): ResultFrameNode {
+  return {
+    id: crypto.randomUUID(),
+    type: 'frame',
+    direction: 'column',
+    gap: 12,
+    padding: { top: 16, right: 16, bottom: 16, left: 16 },
+    align: 'stretch',
+    justify: 'start',
+    children: [],
+    ...overrides,
+  };
+}
+
+export function newTextNode(overrides: Partial<ResultTextNode> = {}): ResultTextNode {
+  return {
+    id: crypto.randomUUID(),
+    type: 'text',
+    spans: [{ type: 'text', value: 'Text' }],
+    fontSize: 16,
+    fontWeight: 400,
+    textAlign: 'left',
+    ...overrides,
+  };
+}
+
+export function newImageNode(overrides: Partial<ResultImageNode> = {}): ResultImageNode {
+  return {
+    id: crypto.randomUUID(),
+    type: 'image',
+    src: '',
+    alt: '',
+    fit: 'cover',
+    width: { mode: 'fixed', value: 200 },
+    height: { mode: 'fixed', value: 200 },
+    ...overrides,
+  };
+}
+
+/** Pre-styled large heading text. */
+export function newTitleNode(): ResultTextNode {
+  return newTextNode({
+    spans: [{ type: 'text', value: 'Your title' }],
+    fontSize: 32,
+    fontWeight: 700,
+    textAlign: 'center',
+  });
+}
+
+/** Pre-styled subdued subheading text. */
+export function newSubtitleNode(): ResultTextNode {
+  return newTextNode({
+    spans: [{ type: 'text', value: 'Your subtitle' }],
+    fontSize: 18,
+    fontWeight: 400,
+    textAlign: 'center',
+  });
+}
+
+/** Horizontal nav frame: logo on the left, optional title on the right. */
+export function newNavWithLogoNode(): ResultFrameNode {
+  return newFrameNode({
+    direction: 'row',
+    gap: 12,
+    padding: { top: 16, right: 24, bottom: 16, left: 24 },
+    align: 'center',
+    justify: 'space-between',
+    width: { mode: 'fill' },
+    children: [
+      newImageNode({
+        src: '',
+        alt: 'Logo',
+        fit: 'contain',
+        width: { mode: 'fixed', value: 120 },
+        height: { mode: 'fixed', value: 32 },
+      }),
+    ],
+  });
 }
 
 /* ─── Design Config ─────────────────────────────────────────────── */
