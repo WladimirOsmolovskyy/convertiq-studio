@@ -65,14 +65,103 @@ export interface ScoringRule {
   ai_prompt: string;
 }
 
-export interface ScoreResult {
+/* ─── Result Pages ──────────────────────────────────────────────── */
+
+/** A span inside a TextNode. Either literal text or a variable reference
+ *  that's resolved at render time against the response context (score,
+ *  answers, lead fields). Variable keys are stable strings:
+ *    - 'score'                      → total numeric score
+ *    - 'page.name' | 'page.range'   → matched ResultPage metadata
+ *    - 'answer.<questionId>'        → answer value for that question
+ *    - 'lead.<leadFieldId>'         → captured lead-field value
+ *  Unknown keys render as empty strings. */
+export type TextSpan =
+  | { type: 'text'; value: string }
+  | { type: 'var'; key: string };
+
+export type ResultSizeMode = 'fixed' | 'fill' | 'fit';
+
+export interface ResultSize {
+  mode: ResultSizeMode;
+  /** Used only when mode === 'fixed'. Pixels. */
+  value?: number;
+}
+
+export interface ResultPadding {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+interface ResultNodeBase {
+  id: string;
+  width?: ResultSize;
+  height?: ResultSize;
+}
+
+export interface ResultFrameNode extends ResultNodeBase {
+  type: 'frame';
+  direction: 'row' | 'column';
+  /** px gap between children */
+  gap: number;
+  padding: ResultPadding;
+  /** Cross-axis alignment */
+  align: 'start' | 'center' | 'end' | 'stretch';
+  /** Main-axis alignment */
+  justify: 'start' | 'center' | 'end' | 'space-between';
+  /** CSS color or gradient. */
+  background?: string;
+  borderRadius?: number;
+  children: ResultNode[];
+}
+
+export interface ResultTextNode extends ResultNodeBase {
+  type: 'text';
+  spans: TextSpan[];
+  fontSize?: number;
+  fontWeight?: number;
+  lineHeight?: number;
+  /** em */
+  letterSpacing?: number;
+  color?: string;
+  textAlign?: 'left' | 'center' | 'right';
+  fontFamily?: string;
+}
+
+export interface ResultImageNode extends ResultNodeBase {
+  type: 'image';
+  src: string;
+  alt?: string;
+  fit?: 'cover' | 'contain';
+  borderRadius?: number;
+}
+
+export type ResultNode = ResultFrameNode | ResultTextNode | ResultImageNode;
+
+export interface ResultPage {
   id: string;
   questionnaire_id: string;
+  name: string;
   min_score: number;
   max_score: number;
-  title: string;
-  description: string;
   sort_order: number;
+  /** Single root frame containing the page layout. */
+  content: ResultFrameNode;
+}
+
+/** Default empty content tree for a fresh result page. */
+export function defaultResultPageContent(): ResultFrameNode {
+  return {
+    id: crypto.randomUUID(),
+    type: 'frame',
+    direction: 'column',
+    gap: 16,
+    padding: { top: 32, right: 24, bottom: 32, left: 24 },
+    align: 'center',
+    justify: 'start',
+    children: [],
+  };
 }
 
 /* ─── Design Config ─────────────────────────────────────────────── */

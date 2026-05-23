@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import type { Question, QuestionBranch, ScoringRule, ScoreResult, DesignConfig, Questionnaire, LeadField } from '@/lib/types';
-import { defaultDesign } from '@/lib/types';
+import type { Question, QuestionBranch, ScoringRule, ResultPage, DesignConfig, Questionnaire, LeadField } from '@/lib/types';
+import { defaultDesign, defaultResultPageContent } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -10,7 +10,7 @@ interface QuestionnaireState {
   questions: Question[];
   branches: QuestionBranch[];
   scoringRules: ScoringRule[];
-  scoreResults: ScoreResult[];
+  resultPages: ResultPage[];
   design: DesignConfig;
   isDirty: boolean;
   isSaving: boolean;
@@ -20,7 +20,7 @@ interface QuestionnaireState {
   setQuestions: (q: Question[]) => void;
   setBranches: (b: QuestionBranch[]) => void;
   setScoringRules: (s: ScoringRule[]) => void;
-  setScoreResults: (s: ScoreResult[]) => void;
+  setResultPages: (s: ResultPage[]) => void;
   setDesign: (d: DesignConfig) => void;
   updateDesign: (partial: Partial<DesignConfig>) => void;
   addQuestion: (type: Question['type']) => void;
@@ -34,9 +34,9 @@ interface QuestionnaireState {
   updateBranch: (id: string, updates: Partial<QuestionBranch>) => void;
   removeBranch: (id: string) => void;
   updateScoringRule: (questionId: string, updates: Partial<ScoringRule>) => void;
-  addScoreResult: () => void;
-  updateScoreResult: (id: string, updates: Partial<ScoreResult>) => void;
-  removeScoreResult: (id: string) => void;
+  addResultPage: () => void;
+  updateResultPage: (id: string, updates: Partial<ResultPage>) => void;
+  removeResultPage: (id: string) => void;
   updateTitle: (title: string) => void;
   updateSlug: (slug: string) => void;
   setDomain: (domainId: string | null) => void;
@@ -50,7 +50,7 @@ interface QuestionnaireState {
     questions: Question[];
     branches: QuestionBranch[];
     scoringRules: ScoringRule[];
-    scoreResults: ScoreResult[];
+    resultPages: ResultPage[];
     design: DesignConfig;
   }) => void;
   reset: () => void;
@@ -62,7 +62,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
   questions: [],
   branches: [],
   scoringRules: [],
-  scoreResults: [],
+  resultPages: [],
   design: defaultDesign,
   isDirty: false,
   isSaving: false,
@@ -72,7 +72,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
   setQuestions: (q) => set({ questions: q, isDirty: true }),
   setBranches: (b) => set({ branches: b, isDirty: true }),
   setScoringRules: (s) => set({ scoringRules: s, isDirty: true }),
-  setScoreResults: (s) => set({ scoreResults: s, isDirty: true }),
+  setResultPages: (s) => set({ resultPages: s, isDirty: true }),
   setDesign: (d) => set({ design: d, isDirty: true }),
 
   updateDesign: (partial) => {
@@ -205,19 +205,30 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
     }
   },
 
-  addScoreResult: () => {
-    const results = get().scoreResults;
+  addResultPage: () => {
+    const pages = get().resultPages;
     set({
-      scoreResults: [...results, { id: crypto.randomUUID(), questionnaire_id: get().questionnaire?.id || '', min_score: 0, max_score: 10, title: 'Result Title', description: 'Result description', sort_order: results.length }],
+      resultPages: [
+        ...pages,
+        {
+          id: crypto.randomUUID(),
+          questionnaire_id: get().questionnaire?.id || '',
+          name: 'Result',
+          min_score: 0,
+          max_score: 10,
+          sort_order: pages.length,
+          content: defaultResultPageContent(),
+        },
+      ],
       isDirty: true,
     });
   },
 
-  updateScoreResult: (id, updates) =>
-    set({ scoreResults: get().scoreResults.map((r) => (r.id === id ? { ...r, ...updates } : r)), isDirty: true }),
+  updateResultPage: (id, updates) =>
+    set({ resultPages: get().resultPages.map((r) => (r.id === id ? { ...r, ...updates } : r)), isDirty: true }),
 
-  removeScoreResult: (id) =>
-    set({ scoreResults: get().scoreResults.filter((r) => r.id !== id), isDirty: true }),
+  removeResultPage: (id) =>
+    set({ resultPages: get().resultPages.filter((r) => r.id !== id), isDirty: true }),
 
   updateTitle: (title) => {
     const q = get().questionnaire;
@@ -287,7 +298,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
   hydrate: (data) => set({ ...data, isDirty: false, isSaving: false, saveStatus: 'idle' }),
 
   reset: () =>
-    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], scoreResults: [], design: defaultDesign, isDirty: false, isSaving: false, saveStatus: 'idle' }),
+    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], resultPages: [], design: defaultDesign, isDirty: false, isSaving: false, saveStatus: 'idle' }),
 
   saveAll: async () => {
     // Read fresh state on each call so we always persist the latest store.
@@ -335,12 +346,12 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
         if (sDelErr) console.error('Delete scoring rules failed:', sDelErr);
       }
 
-      // 3. Delete old score results
+      // 3. Delete old result pages
       const { error: srDelErr } = await supabase
-        .from('score_results')
+        .from('result_pages')
         .delete()
         .eq('questionnaire_id', qId);
-      if (srDelErr) console.error('Delete score results failed:', srDelErr);
+      if (srDelErr) console.error('Delete result pages failed:', srDelErr);
 
       // 4. Delete old questions
       const { error: qDelErr } = await supabase
@@ -397,20 +408,20 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
         if (sInsErr) console.error('Insert scoring rules failed:', sInsErr);
       }
 
-      // 8. Insert new score results
-      if (s.scoreResults.length > 0) {
-        const { error: srInsErr } = await supabase.from('score_results').insert(
-          s.scoreResults.map((r) => ({
+      // 8. Insert new result pages
+      if (s.resultPages.length > 0) {
+        const { error: srInsErr } = await supabase.from('result_pages').insert(
+          s.resultPages.map((r) => ({
             id: r.id,
             questionnaire_id: qId,
+            name: r.name,
             min_score: r.min_score,
             max_score: r.max_score,
-            title: r.title,
-            description: r.description,
             sort_order: r.sort_order,
+            content: r.content,
           })),
         );
-        if (srInsErr) console.error('Insert score results failed:', srInsErr);
+        if (srInsErr) console.error('Insert result pages failed:', srInsErr);
       }
 
       // 9. Upsert design

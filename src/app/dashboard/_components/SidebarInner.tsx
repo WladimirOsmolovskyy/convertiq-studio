@@ -123,9 +123,9 @@ export default function SidebarInner({
       match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/logic/.test(p),
     },
     {
-      label: 'Scoring',
-      path: qTab('scoring'),
-      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/scoring/.test(p),
+      label: 'Result',
+      path: qTab('result'),
+      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/result/.test(p),
     },
     {
       label: 'Design',
