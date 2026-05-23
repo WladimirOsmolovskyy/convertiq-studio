@@ -20,7 +20,7 @@ export default function PreviewPage() {
       questions={store.questions}
       branches={store.branches}
       scoringRules={store.scoringRules}
-      scoreResults={store.scoreResults}
+      resultPages={store.resultPages}
       design={store.design}
     />
   );

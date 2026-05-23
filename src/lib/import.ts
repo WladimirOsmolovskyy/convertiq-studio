@@ -1,6 +1,49 @@
 
-import type { Question, QuestionBranch, ScoringRule, ScoreResult, QuestionType, BranchOperator, DesignConfig } from './types';
+import type {
+  Question,
+  QuestionBranch,
+  ScoringRule,
+  ResultPage,
+  ResultFrameNode,
+  QuestionType,
+  BranchOperator,
+  DesignConfig,
+} from './types';
 import { defaultDesign } from './types';
+
+/** Build a seeded content tree mirroring the migration's projection of
+ *  the legacy `score_results` shape — a centered column frame with two
+ *  text blocks (title + description). Keeps imports visually consistent
+ *  with existing in-DB result pages until the full block authoring lands. */
+function seedResultContent(title: string, description: string): ResultFrameNode {
+  return {
+    id: crypto.randomUUID(),
+    type: 'frame',
+    direction: 'column',
+    gap: 16,
+    padding: { top: 32, right: 24, bottom: 32, left: 24 },
+    align: 'center',
+    justify: 'start',
+    children: [
+      {
+        id: crypto.randomUUID(),
+        type: 'text',
+        spans: [{ type: 'text', value: title }],
+        fontSize: 28,
+        fontWeight: 700,
+        textAlign: 'center',
+      },
+      {
+        id: crypto.randomUUID(),
+        type: 'text',
+        spans: [{ type: 'text', value: description }],
+        fontSize: 16,
+        fontWeight: 400,
+        textAlign: 'center',
+      },
+    ],
+  };
+}
 
 /* ─── Import JSON Schema ───────────────────────────────────────── */
 
@@ -395,21 +438,21 @@ export function transformImport(
   questions?: Question[];
   branches?: QuestionBranch[];
   scoringRules?: ScoringRule[];
-  scoreResults?: ScoreResult[];
+  resultPages?: ResultPage[];
   design?: DesignConfig;
 } {
   // If design-only import (no questions)
   if (!data.questions || data.questions.length === 0) {
     return {
       design: data.design ? mergeDesign(currentDesign || defaultDesign, data.design) : undefined,
-      scoreResults: data.score_results ? (data.score_results || []).map((r, idx) => ({
+      resultPages: data.score_results ? (data.score_results || []).map((r, idx) => ({
         id: crypto.randomUUID(),
         questionnaire_id: questionnaireId,
+        name: r.title || 'Result',
         min_score: r.min_score,
         max_score: r.max_score,
-        title: r.title,
-        description: r.description || '',
         sort_order: idx,
+        content: seedResultContent(r.title || '', r.description || ''),
       })) : undefined,
     };
   }
@@ -492,19 +535,19 @@ export function transformImport(
     };
   });
 
-  // Transform score results
-  const scoreResults: ScoreResult[] = (data.score_results || []).map((r, idx) => ({
+  // Transform score result ranges → result pages (with seeded content blocks)
+  const resultPages: ResultPage[] = (data.score_results || []).map((r, idx) => ({
     id: crypto.randomUUID(),
     questionnaire_id: questionnaireId,
+    name: r.title || 'Result',
     min_score: r.min_score,
     max_score: r.max_score,
-    title: r.title,
-    description: r.description || '',
     sort_order: idx,
+    content: seedResultContent(r.title || '', r.description || ''),
   }));
 
   // Merge design if provided
   const design = data.design ? mergeDesign(currentDesign || defaultDesign, data.design) : undefined;
 
-  return { questions, branches, scoringRules, scoreResults, design };
+  return { questions, branches, scoringRules, resultPages, design };
 }

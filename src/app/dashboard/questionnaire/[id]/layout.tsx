@@ -33,7 +33,7 @@ export default function EditorLayout({
       const [qRes, questionsRes, resultsRes, designRes] = await Promise.all([
         supabase.from('questionnaires').select('*').eq('id', id).single(),
         supabase.from('questions').select('*').eq('questionnaire_id', id).order('sort_order'),
-        supabase.from('score_results').select('*').eq('questionnaire_id', id).order('sort_order'),
+        supabase.from('result_pages').select('*').eq('questionnaire_id', id).order('sort_order'),
         supabase.from('questionnaire_designs').select('*').eq('questionnaire_id', id).single(),
       ]);
 
@@ -51,7 +51,7 @@ export default function EditorLayout({
           questions: questionsRes.data || [],
           branches: branchRes.data || [],
           scoringRules: scoreRulesRes.data || [],
-          scoreResults: resultsRes.data || [],
+          resultPages: resultsRes.data || [],
           design: designRes.data?.config && Object.keys(designRes.data.config).length > 0
             ? { ...defaultDesign, ...designRes.data.config }
             : defaultDesign,

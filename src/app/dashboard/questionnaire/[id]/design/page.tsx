@@ -467,7 +467,7 @@ export default function DesignEditor() {
             questions={store.questions}
             branches={store.branches}
             scoringRules={store.scoringRules}
-            scoreResults={store.scoreResults}
+            resultPages={store.resultPages}
             design={store.design}
           />
         ) : (

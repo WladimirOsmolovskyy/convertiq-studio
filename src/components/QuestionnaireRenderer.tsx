@@ -32,11 +32,12 @@ import type {
   Question,
   QuestionBranch,
   Questionnaire,
-  ScoreResult,
+  ResultPage,
   ScoringRule,
 } from '@/lib/types';
 import { isCustomField, resolveLeadFields } from '@/lib/leadFields';
 import { buildLeadPayload } from '@/lib/leadPayload';
+import { deriveTitleDescription } from '@/lib/resultPage';
 
 type StylesMap = Record<string, string>;
 type AnswersMap = Record<string, { value?: string; selected_options?: string[] }>;
@@ -46,7 +47,7 @@ export interface QuestionnaireRendererProps {
   questions: Question[];
   branches: QuestionBranch[];
   scoringRules: ScoringRule[];
-  scoreResults: ScoreResult[];
+  resultPages: ResultPage[];
   design: DesignConfig;
   /** CSS module providing the class surface this component uses. */
   styles: StylesMap;
@@ -65,7 +66,7 @@ export default function QuestionnaireRenderer({
   questions,
   branches,
   scoringRules,
-  scoreResults,
+  resultPages,
   design,
   styles,
   mode = 'public',
@@ -78,7 +79,7 @@ export default function QuestionnaireRenderer({
   const [questionPath, setQuestionPath] = useState<number[]>([0]);
   const [completed, setCompleted] = useState(false);
   const [totalScore, setTotalScore] = useState(0);
-  const [matchedResult, setMatchedResult] = useState<ScoreResult | null>(null);
+  const [matchedPage, setMatchedPage] = useState<ResultPage | null>(null);
   const [sessionId] = useState(() => nanoid());
   const [submitting, setSubmitting] = useState(false);
   const [, setRating] = useState(0);
@@ -261,7 +262,7 @@ export default function QuestionnaireRenderer({
     setQuestionPath([0]);
     setCompleted(false);
     setTotalScore(0);
-    setMatchedResult(null);
+    setMatchedPage(null);
     setSubmitting(false);
     setCustomFieldValues({});
     setShowLeadCapture(false);
@@ -273,8 +274,8 @@ export default function QuestionnaireRenderer({
     const score = calculateScore(finalAnswers);
     setTotalScore(score);
 
-    const matched = scoreResults.find((r) => score >= r.min_score && score <= r.max_score);
-    setMatchedResult(matched || null);
+    const matched = resultPages.find((r) => score >= r.min_score && score <= r.max_score);
+    setMatchedPage(matched || null);
 
     const leadFieldValues: Record<string, string> = { ...capturedFields };
     for (const [id, v] of Object.entries(customFieldValues)) {
@@ -769,53 +770,61 @@ export default function QuestionnaireRenderer({
             </div>
           </>
         ) : (
-          /* Results */
-          <div className={styles.resultsPage}>
-            <div className={styles.resultsIcon}>🎉</div>
-            <h1
-              className={styles.resultsTitle}
-              style={{
-                fontFamily: design.typography.headingFont,
-                fontWeight: design.typography.heading?.weight ?? design.typography.headingWeight,
-                letterSpacing: `${design.typography.heading?.letterSpacing ?? -0.02}em`,
-                color: design.typography.heading?.color ?? design.colors.text,
-              }}
-            >
-              {matchedResult?.title || 'Thank you!'}
-            </h1>
+          /* Results — derived from the matched ResultPage's content blocks.
+             Block-tree rendering with variable interpolation lands in the
+             next step; for now we project the seeded text nodes back into
+             a title + description. */
+          (() => {
+            const derived = matchedPage ? deriveTitleDescription(matchedPage) : null;
+            return (
+              <div className={styles.resultsPage}>
+                <div className={styles.resultsIcon}>🎉</div>
+                <h1
+                  className={styles.resultsTitle}
+                  style={{
+                    fontFamily: design.typography.headingFont,
+                    fontWeight: design.typography.heading?.weight ?? design.typography.headingWeight,
+                    letterSpacing: `${design.typography.heading?.letterSpacing ?? -0.02}em`,
+                    color: design.typography.heading?.color ?? design.colors.text,
+                  }}
+                >
+                  {derived?.title || 'Thank you!'}
+                </h1>
 
-            <div
-              className={styles.resultsScore}
-              style={{
-                background: design.components.option.selectedBackground,
-                color: design.colors.accent,
-              }}
-            >
-              Score: {totalScore}
-            </div>
+                <div
+                  className={styles.resultsScore}
+                  style={{
+                    background: design.components.option.selectedBackground,
+                    color: design.colors.accent,
+                  }}
+                >
+                  Score: {totalScore}
+                </div>
 
-            {matchedResult ? (
-              <p
-                className={styles.resultsDescription}
-                style={{ color: design.colors.textMuted }}
-              >
-                {matchedResult.description}
-              </p>
-            ) : (
-              <p
-                className={styles.resultsDescription}
-                style={{ color: design.colors.textMuted }}
-              >
-                Your responses have been recorded. Thank you for completing the questionnaire!
-              </p>
-            )}
+                {derived && derived.description ? (
+                  <p
+                    className={styles.resultsDescription}
+                    style={{ color: design.colors.textMuted }}
+                  >
+                    {derived.description}
+                  </p>
+                ) : (
+                  <p
+                    className={styles.resultsDescription}
+                    style={{ color: design.colors.textMuted }}
+                  >
+                    Your responses have been recorded. Thank you for completing the questionnaire!
+                  </p>
+                )}
 
-            {isPreview && (
-              <button className={styles.previewRestartBtnLarge} onClick={handleRestart}>
-                ↻ Restart preview
-              </button>
-            )}
-          </div>
+                {isPreview && (
+                  <button className={styles.previewRestartBtnLarge} onClick={handleRestart}>
+                    ↻ Restart preview
+                  </button>
+                )}
+              </div>
+            );
+          })()
         )}
       </div>
     </div>

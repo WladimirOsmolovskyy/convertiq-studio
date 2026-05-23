@@ -62,7 +62,7 @@ export default function ImportModal({ onClose }: ImportModalProps) {
     setImporting(true);
 
     const qId = store.questionnaire.id;
-    const { questions, branches, scoringRules, scoreResults, design } = transformImport(preview, qId, store.design);
+    const { questions, branches, scoringRules, resultPages, design } = transformImport(preview, qId, store.design);
 
     // Update title if provided
     if (preview.title) {
@@ -75,8 +75,8 @@ export default function ImportModal({ onClose }: ImportModalProps) {
       if (branches) store.setBranches(branches);
       if (scoringRules) store.setScoringRules(scoringRules);
     }
-    if (scoreResults && scoreResults.length > 0) {
-      store.setScoreResults(scoreResults);
+    if (resultPages && resultPages.length > 0) {
+      store.setResultPages(resultPages);
     }
 
     // Apply design (deep-merged)

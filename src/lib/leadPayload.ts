@@ -3,10 +3,11 @@ import type {
   Question,
   QuestionOption,
   ScoringRule,
-  ScoreResult,
+  ResultPage,
   Questionnaire,
 } from '@/lib/types';
 import { resolveLeadFields } from '@/lib/leadFields';
+import { deriveTitleDescription } from '@/lib/resultPage';
 
 /* ─── Public payload shape ────────────────────────────────────── */
 /*
@@ -80,7 +81,7 @@ interface BuildArgs {
   startedAt: string | null;
   completedAt: string | null;
   totalScore: number | null;
-  matchedResult: ScoreResult | null;
+  matchedResult: ResultPage | null;
   host: string | null;
   userAgent: string | null;
   questionnaire: Pick<Questionnaire, 'id' | 'title' | 'slug' | 'project_id' | 'lead_fields'>;
@@ -185,11 +186,16 @@ export function buildLeadPayload(args: BuildArgs): LeadPayload {
       duration_ms: durationMs,
       total_score: totalScore,
       result: matchedResult
-        ? {
-            id: matchedResult.id,
-            title: matchedResult.title,
-            description: matchedResult.description ?? null,
-          }
+        ? (() => {
+            // Derive the human-readable title/description from the page's
+            // content blocks for backward-compatible webhook payloads.
+            const { title, description } = deriveTitleDescription(matchedResult);
+            return {
+              id: matchedResult.id,
+              title,
+              description: description || null,
+            };
+          })()
         : null,
       source: { host, user_agent: userAgent },
     },

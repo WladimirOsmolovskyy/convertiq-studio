@@ -16,7 +16,8 @@
       "Bash(gh pr *)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(xargs ls -la)"
     ]
   }
 }
