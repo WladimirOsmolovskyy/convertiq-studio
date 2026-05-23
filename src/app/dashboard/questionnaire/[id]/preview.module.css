@@ -7,10 +7,12 @@
   padding: 0 2rem 2rem;
   transition: background 0.3s;
   position: relative;
+  container-type: inline-size;
 }
 
 .container {
   width: 100%;
+  margin: auto 0;
   transition: max-width 0.3s;
 }
 
@@ -152,7 +154,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
 }
-@media (max-width: 480px) {
+@container (max-width: 480px) {
   .optionsGrid { grid-template-columns: 1fr; }
 }
 
