@@ -10,25 +10,28 @@ Sessions running in a feature worktree at `~/Programming/convertiq-agent-N` — 
 
 ## You're an agent
 
-You're working in a feature worktree (e.g. `~/Programming/convertiq-agent-N`). An orchestrator (a separate Claude Code session in the main checkout) briefs you on a feature, you implement it, you `land` it. That's the whole loop.
+You're working in a feature worktree (e.g. `~/Programming/convertiq-agent-N`). An orchestrator (a separate Claude Code session in the main checkout) briefs you on a feature, you implement it, you **stop and report**. The user (or the orchestrator) decides when to commit your work.
 
 ## What you do
 
 1. **Read the brief.** It tells you scope, files to read, success criteria.
 2. **Plan.** Post the plan, wait for approval before writing code.
 3. **Implement.** Follow the workflow rules in [CLAUDE.md](./CLAUDE.md#workflow-rules).
-4. **`land "feat: short description"`.** This is just `git add -A && git commit -m "..."`. Local only, no push.
-5. **Report back** to the user with:
-   - Diff stat: `git diff --stat staging..HEAD`
+4. **Stop and report.** Do *not* commit. Post:
+   - A proposed commit message (Conventional Commits format: `type: description`)
+   - Diff summary: `git status` + `git diff --stat`
    - **New migrations?** File number + what the schema change does.
    - **New env vars?** Names + what each is for. Confirm you added them to `.env.local.example`.
    - **Suggested next step**, one of:
      - *"Can be tested locally with `npm run dev`"* (pure code, no schema/env dependency)
      - *"Needs migration applied before testing — orchestrator runs `stage`"*
      - *"Needs env vars set in Vercel before staging deploy"* (and which ones)
+   - Whether this is the final commit for the feature, or whether more changes are coming.
+5. **Wait.** The user will either run `land "msg"` themselves, ask you to make changes first, or ask the orchestrator to commit for you. Do nothing until told.
 
 ## What you don't do
 
+- **Don't run `land`, `git add`, `git commit`** — committing is the user's call, not yours.
 - Don't `git push`, `stage`, `ship`, or `git merge` — orchestrator-only.
 - Don't run migrations yourself. Write the SQL file; the orchestrator applies it.
 - Don't checkout other branches. Stay on your assigned `agent-N` branch.
