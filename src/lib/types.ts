@@ -339,6 +339,82 @@ export interface DesignConfig {
     type: 'solid' | 'gradient' | 'image';
     value: string; // color, gradient CSS, or image URL
   };
+  /**
+   * Sparse per-element style overrides. The keys above (`colors`, `typography`,
+   * `layout`, `components`, `background`) define the GLOBAL design — treated as
+   * the "variables" namespace in the inspector. `elements` lets the editor
+   * override specific UI elements (selected on canvas) without touching the
+   * globals. Phase 1: a curated element list; only `fill`, `radius`, `padding`
+   * are wired end-to-end (Commit C). Other fields exist in the type so the
+   * inspector UI shell compiles; renderer applies them only when present.
+   */
+  elements?: Partial<Record<ElementId, ElementStyles>>;
+}
+
+/**
+ * The set of canvas-selectable element targets. We use string IDs with
+ * dotted-namespace prefixes for question-type-scoped sub-elements
+ * (e.g. `radio.option` overrides apply only inside radio questions).
+ */
+export type ElementId =
+  // Page-level
+  | 'page'
+  | 'container'
+  | 'progress'
+  | 'navButtons'
+  | 'button'
+  // Question card (applies to all question types unless type-scoped below)
+  | 'questionCard'
+  | 'questionTitle'
+  | 'questionDescription'
+  // Type-scoped sub-elements
+  | 'radio.optionsGrid'
+  | 'radio.option'
+  | 'checkbox.optionsList'
+  | 'checkbox.option'
+  | 'text.input'
+  | 'textarea.input'
+  | 'rating.starsContainer'
+  | 'rating.star';
+
+/**
+ * A variable reference. Phase 2 will let any styled value EITHER hold a
+ * literal OR reference a global (e.g. `{ $var: 'colors.primary' }`). For
+ * Commit A this type just exists so handlers + components compile.
+ */
+export type VarRef = { $var: string };
+
+/** Either a literal value or a variable reference. */
+export type Styled<T> = T | VarRef;
+
+/**
+ * Per-element style override. All fields optional and sparse. Most are
+ * shell-only in phase 1 — see `DesignConfig.elements` comment.
+ */
+export interface ElementStyles {
+  // Styles section — `fill`, `radius`, `padding` wired in Commit C
+  opacity?: Styled<number>;
+  visible?: Styled<boolean>;
+  fill?: Styled<string>;
+  overflow?: 'visible' | 'hidden' | 'auto' | 'scroll';
+  radius?: Styled<number>;
+  border?: Styled<string>;
+  shadows?: Styled<string>;
+  // Layout section
+  layoutType?: 'stack' | 'grid';
+  direction?: 'horizontal' | 'vertical';
+  distribute?: 'start' | 'center' | 'end' | 'space-between' | 'space-around';
+  align?: 'start' | 'center' | 'end';
+  wrap?: boolean;
+  gap?: Styled<number>;
+  padding?: Styled<number>;
+  // Size section
+  width?: { value: number; unit: 'px' | 'rel' | 'fit' | 'auto' };
+  height?: { value: number; unit: 'px' | 'rel' | 'fit' | 'auto' };
+  // Position section
+  positionType?: 'relative' | 'absolute' | 'fixed';
+  // Link section
+  linkHref?: string;
 }
 
 export const defaultDesign: DesignConfig = {
