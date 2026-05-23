@@ -38,11 +38,13 @@ interface Props {
   page: ResultPage;
   selectedNodeId: string | null;
   onSelectNode: (id: string | null) => void;
+  /** Substring filter on row labels (case-insensitive). */
+  filter: string;
 }
 
 const INDENT_PX = 14;
 
-export default function LayersPanel({ page, selectedNodeId, onSelectNode }: Props) {
+export default function LayersPanel({ page, selectedNodeId, onSelectNode, filter }: Props) {
   const {
     moveResultPageNode,
     moveResultPageNodeTo,
@@ -50,14 +52,20 @@ export default function LayersPanel({ page, selectedNodeId, onSelectNode }: Prop
   } = useQuestionnaireStore();
   const [moveMenuFor, setMoveMenuFor] = useState<string | null>(null);
 
-  const rows = Array.from(walkTree(page.content));
+  const allRows = Array.from(walkTree(page.content));
+  const f = filter.trim().toLowerCase();
+  const rows = f
+    ? allRows.filter(({ node }) =>
+        layerLabel(node, node.id === page.content.id).toLowerCase().includes(f),
+      )
+    : allRows;
 
   return (
     <div className={styles.layersPanel}>
-      <div className={styles.layersHeader}>
-        <h3>Layers</h3>
-      </div>
       <div className={styles.layersBody}>
+        {f && rows.length === 0 && (
+          <div className={styles.pageListEmpty}>No layers match &ldquo;{filter}&rdquo;.</div>
+        )}
         {rows.map(({ node, depth }) => {
           const isRoot = node.id === page.content.id;
           const isSelected = node.id === selectedNodeId;

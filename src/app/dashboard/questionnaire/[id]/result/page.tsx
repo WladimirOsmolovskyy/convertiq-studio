@@ -10,12 +10,13 @@
  * metadata lives in the Zustand store, picked up by the canvas/inspector.
  */
 
+import type { CSSProperties } from 'react';
 import { useMemo, useState } from 'react';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
-import PageList from './_PageList';
-import LayersPanel from './_LayersPanel';
+import LeftRail from './_LeftRail';
 import Canvas from './_Canvas';
 import Inspector from './_Inspector';
+import { useResize } from './_useResize';
 import styles from './result.module.css';
 
 export default function ResultEditor() {
@@ -44,21 +45,43 @@ export default function ResultEditor() {
     setSelectedNodeId(null);
   };
 
+  // Persisted, drag-resizable rail widths. Stored per-user in localStorage
+  // so they survive reloads but stay scoped to this editor.
+  const leftRail = useResize({
+    initial: 240,
+    min: 180,
+    max: 420,
+    direction: 1,
+    storageKey: 'cq.result.leftWidth',
+  });
+  const rightRail = useResize({
+    initial: 320,
+    min: 240,
+    max: 520,
+    direction: -1,
+    storageKey: 'cq.result.rightWidth',
+  });
+
+  const gridStyle = {
+    gridTemplateColumns: `${leftRail.width}px 1fr ${rightRail.width}px`,
+  } as CSSProperties;
+
   return (
-    <div className={styles.editor}>
-      <div className={styles.leftRail}>
-        <PageList
+    <div className={styles.editor} style={gridStyle}>
+      <div className={styles.railWrap}>
+        <LeftRail
           pages={resultPages}
+          selectedPage={selectedPage}
           selectedPageId={selectedPageId}
-          onSelect={handleSelectPage}
+          selectedNodeId={selectedNodeId}
+          onSelectPage={handleSelectPage}
+          onSelectNode={setSelectedNodeId}
         />
-        {selectedPage && (
-          <LayersPanel
-            page={selectedPage}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={setSelectedNodeId}
-          />
-        )}
+        <div
+          className={styles.resizeHandleRight}
+          onMouseDown={leftRail.onMouseDown}
+          aria-hidden
+        />
       </div>
 
       {selectedPage ? (
@@ -77,15 +100,22 @@ export default function ResultEditor() {
         </div>
       )}
 
-      {selectedPage ? (
-        <Inspector page={selectedPage} selectedNodeId={selectedNodeId} />
-      ) : (
-        <aside className={styles.inspector}>
-          <div className={styles.inspectorEmpty}>
-            Properties will appear here once you select a page.
-          </div>
-        </aside>
-      )}
+      <div className={styles.railWrap}>
+        <div
+          className={styles.resizeHandleLeft}
+          onMouseDown={rightRail.onMouseDown}
+          aria-hidden
+        />
+        {selectedPage ? (
+          <Inspector page={selectedPage} selectedNodeId={selectedNodeId} />
+        ) : (
+          <aside className={styles.inspector}>
+            <div className={styles.inspectorEmpty}>
+              Properties will appear here once you select a page.
+            </div>
+          </aside>
+        )}
+      </div>
     </div>
   );
 }

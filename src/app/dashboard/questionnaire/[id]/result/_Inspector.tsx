@@ -14,8 +14,9 @@
  * Common: size mode + value (width/height), delete (root excluded).
  */
 
-import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Plus, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { ArrowDown, ArrowUp, Hash, Mail, Plus, Search, Trash2, Type, X } from 'lucide-react';
 import type {
   ResultFrameNode,
   ResultImageNode,
@@ -58,7 +59,6 @@ export default function Inspector({ page, selectedNodeId }: Props) {
     return (
       <aside className={styles.inspector}>
         <PagePropsSection page={page} updateResultPage={updateResultPage} />
-        <VariableReference variables={variables} />
       </aside>
     );
   }
@@ -118,8 +118,6 @@ export default function Inspector({ page, selectedNodeId }: Props) {
           </button>
         </div>
       )}
-
-      <VariableReference variables={variables} />
     </aside>
   );
 }
@@ -270,29 +268,48 @@ function TextProps({
   patch: (p: Partial<ResultNode>) => void;
   variables: AvailableVariable[];
 }) {
-  const setSpans = (spans: TextSpan[]) => patch({ spans });
-  const updateSpan = (idx: number, span: TextSpan) =>
-    setSpans(node.spans.map((s, i) => (i === idx ? span : s)));
-  const removeSpan = (idx: number) =>
-    setSpans(node.spans.filter((_, i) => i !== idx));
-  const addText = () =>
-    setSpans([...node.spans, { type: 'text', value: '' }]);
-  const addVar = (key: string) =>
-    setSpans([...node.spans, { type: 'var', key }]);
+  // Normalize: each text node has at most ONE text span (at index 0)
+  // followed by variable spans. Legacy nodes with interleaved text spans
+  // get their text portions concatenated on read.
+  const literalText = node.spans
+    .filter((s): s is { type: 'text'; value: string } => s.type === 'text')
+    .map((s) => s.value)
+    .join('');
+  const varSpans = node.spans.filter(
+    (s): s is { type: 'var'; key: string } => s.type === 'var',
+  );
+
+  const setText = (value: string) => {
+    const next: TextSpan[] = [];
+    if (value.length > 0) next.push({ type: 'text', value });
+    next.push(...varSpans);
+    patch({ spans: next });
+  };
+  const removeVarAt = (varIdx: number) => {
+    const nextVars = varSpans.filter((_, i) => i !== varIdx);
+    const next: TextSpan[] = [];
+    if (literalText.length > 0) next.push({ type: 'text', value: literalText });
+    next.push(...nextVars);
+    patch({ spans: next });
+  };
+  const addVar = (key: string) => {
+    const next: TextSpan[] = [];
+    if (literalText.length > 0) next.push({ type: 'text', value: literalText });
+    next.push(...varSpans, { type: 'var', key });
+    patch({ spans: next });
+  };
 
   return (
     <>
-      <div className={styles.inspectorField}>
-        <label className={styles.inspectorFieldLabel}>Content</label>
-        <SpansEditor
-          spans={node.spans}
-          variables={variables}
-          updateSpan={updateSpan}
-          removeSpan={removeSpan}
-          addText={addText}
-          addVar={addVar}
-        />
-      </div>
+      <SpansEditor
+        text={literalText}
+        varSpans={varSpans}
+        variables={variables}
+        setText={setText}
+        removeVarAt={removeVarAt}
+        addVar={addVar}
+      />
+
 
       <Segmented
         label="Alignment"
@@ -338,115 +355,235 @@ function TextProps({
 }
 
 function SpansEditor({
-  spans,
+  text,
+  varSpans,
   variables,
-  updateSpan,
-  removeSpan,
-  addText,
+  setText,
+  removeVarAt,
   addVar,
 }: {
-  spans: TextSpan[];
+  text: string;
+  varSpans: { type: 'var'; key: string }[];
   variables: AvailableVariable[];
-  updateSpan: (idx: number, span: TextSpan) => void;
-  removeSpan: (idx: number) => void;
-  addText: () => void;
+  setText: (value: string) => void;
+  removeVarAt: (varIdx: number) => void;
   addVar: (key: string) => void;
 }) {
   const [varMenuOpen, setVarMenuOpen] = useState(false);
+  const addBtnRef = useRef<HTMLButtonElement | null>(null);
 
   return (
     <div className={styles.spansList}>
-      {spans.length === 0 && (
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          Empty — add text or a variable below.
-        </div>
-      )}
-      {spans.map((span, idx) =>
-        span.type === 'text' ? (
-          <div key={idx} className={styles.spansRow}>
-            <textarea
-              value={span.value}
-              onChange={(e) => updateSpan(idx, { type: 'text', value: e.target.value })}
-              placeholder="Text…"
-              rows={1}
-            />
-            <button
-              className={styles.varChipRemove}
-              onClick={() => removeSpan(idx)}
-              aria-label="Remove text span"
-            >
-              <X size={14} strokeWidth={2} />
-            </button>
-          </div>
-        ) : (
-          <div key={idx} className={styles.spansRow}>
-            <span className={styles.varChip} style={{ flex: 1 }}>
-              {variables.find((v) => v.key === span.key)?.label ?? span.key}
-              <button
-                className={styles.varChipRemove}
-                onClick={() => removeSpan(idx)}
-                aria-label="Remove variable"
-              >
-                <X size={12} strokeWidth={2} />
-              </button>
-            </span>
-          </div>
-        ),
-      )}
-
-      <div className={styles.addSpan}>
-        <button onClick={addText}>
-          <Plus size={10} strokeWidth={2.25} /> Text
-        </button>
-        <div style={{ position: 'relative', flex: 1 }}>
-          <button style={{ width: '100%' }} onClick={() => setVarMenuOpen((v) => !v)}>
-            <Plus size={10} strokeWidth={2.25} /> Variable
+      <label className={styles.inspectorFieldLabel}>Content</label>
+      <div className={styles.spansFieldRow}>
+        <div className={styles.addVarWrap}>
+          <button
+            ref={addBtnRef}
+            className={styles.addVarBtn}
+            onClick={() => setVarMenuOpen((v) => !v)}
+            aria-label="Insert variable"
+            title="Insert variable"
+          >
+            <Plus size={12} strokeWidth={2.5} />
           </button>
-          {varMenuOpen && (
-            <>
-              <div
-                onClick={() => setVarMenuOpen(false)}
-                style={{ position: 'fixed', inset: 0, zIndex: 10 }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 'calc(100% + 4px)',
-                  right: 0,
-                  zIndex: 11,
-                  background: 'var(--surface)',
-                  border: '1px solid var(--separator)',
-                  borderRadius: 'var(--radius-md)',
-                  boxShadow: 'var(--shadow-md)',
-                  maxHeight: 280,
-                  overflowY: 'auto',
-                  minWidth: 220,
-                }}
-              >
-                {variables.map((v) => (
-                  <button
-                    key={v.key}
-                    className={styles.blockMenuItem}
-                    style={{ width: '100%', borderRadius: 0, border: 'none', justifyContent: 'flex-start' }}
-                    onClick={() => {
-                      addVar(v.key);
-                      setVarMenuOpen(false);
-                    }}
-                  >
-                    <span className={styles.varChip} style={{ pointerEvents: 'none' }}>{v.label}</span>
-                  </button>
-                ))}
-                {variables.length === 0 && (
-                  <div style={{ padding: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    No variables available yet.
-                  </div>
-                )}
-              </div>
-            </>
+        </div>
+        <div className={styles.spansField}>
+          <textarea
+            className={styles.spansTextarea}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Type text…"
+            rows={2}
+          />
+          {varSpans.length > 0 && (
+            <div className={styles.spansChips}>
+              {varSpans.map((span, idx) => (
+                <VariableChip
+                  key={idx}
+                  variable={variables.find((v) => v.key === span.key)}
+                  fallbackKey={span.key}
+                  onRemove={() => removeVarAt(idx)}
+                />
+              ))}
+            </div>
           )}
         </div>
       </div>
+
+      {varMenuOpen && (
+        <VariablePicker
+          variables={variables}
+          anchorRef={addBtnRef}
+          onPick={(key) => {
+            addVar(key);
+            setVarMenuOpen(false);
+          }}
+          onClose={() => setVarMenuOpen(false)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Visual chip representing a bound variable. Used both inline in the
+ *  spans editor and (in larger form) inside the picker dropdown. */
+function VariableChip({
+  variable,
+  fallbackKey,
+  onRemove,
+}: {
+  variable: AvailableVariable | undefined;
+  fallbackKey: string;
+  onRemove?: () => void;
+}) {
+  const group = variable?.group;
+  return (
+    <span className={styles.varChip} style={{ flex: 1 }}>
+      <span className={styles.varChipIcon} aria-hidden>
+        <GroupIcon group={group} />
+      </span>
+      <span className={styles.varChipLabel}>
+        {variable?.label ?? fallbackKey}
+      </span>
+      {onRemove && (
+        <button
+          className={styles.varChipRemove}
+          onClick={onRemove}
+          aria-label="Remove variable"
+        >
+          <X size={11} strokeWidth={2.25} />
+        </button>
+      )}
+    </span>
+  );
+}
+
+function GroupIcon({ group }: { group: AvailableVariable['group'] | undefined }) {
+  if (group === 'score') return <Hash size={11} strokeWidth={2} />;
+  if (group === 'answer') return <Type size={11} strokeWidth={2} />;
+  if (group === 'lead') return <Mail size={11} strokeWidth={2} />;
+  return <Hash size={11} strokeWidth={2} />;
+}
+
+const GROUP_TITLES: Record<AvailableVariable['group'], string> = {
+  score: 'Score',
+  page: 'Page',
+  answer: 'Answers',
+  lead: 'Lead fields',
+};
+
+/** Search-able, grouped variable picker. Rendered via portal so it
+ *  escapes the rail's overflow:hidden clipping. Positions itself
+ *  anchored to the trigger button's bounding rect, with viewport-edge
+ *  fitting so it never gets clipped off-screen. */
+function VariablePicker({
+  variables,
+  anchorRef,
+  onPick,
+  onClose,
+}: {
+  variables: AvailableVariable[];
+  anchorRef: React.RefObject<HTMLElement | null>;
+  onPick: (key: string) => void;
+  onClose: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? variables.filter(
+        (v) => v.label.toLowerCase().includes(q) || v.key.toLowerCase().includes(q),
+      )
+    : variables;
+
+  const groupOrder: AvailableVariable['group'][] = ['score', 'page', 'answer', 'lead'];
+
+  // Compute fixed-position coordinates anchored to the trigger button
+  // in an effect (refs aren't readable during render). The picker is
+  // first rendered off-screen, then snapped into place after mount.
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  useEffect(() => {
+    const PICKER_W = 260;
+    const PICKER_H = 320;
+    const GAP = 4;
+    const el = anchorRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    let left = r.left;
+    let top = r.bottom + GAP;
+    // Fit to viewport: shift left so the right edge stays inside, then
+    // flip above the anchor if there's no room below.
+    if (left + PICKER_W > window.innerWidth - 8) {
+      left = Math.max(8, window.innerWidth - PICKER_W - 8);
+    }
+    if (top + PICKER_H > window.innerHeight - 8) {
+      top = Math.max(8, r.top - PICKER_H - GAP);
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPos({ top, left });
+  }, [anchorRef]);
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <>
+      <div
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
+      />
+      <div
+        className={styles.varPicker}
+        style={{
+          position: 'fixed',
+          top: pos?.top ?? -9999,
+          left: pos?.left ?? -9999,
+          right: 'auto',
+          visibility: pos ? 'visible' : 'hidden',
+        }}
+      >
+        <div className={styles.varPickerSearch}>
+          <Search size={12} strokeWidth={1.75} aria-hidden />
+          <input
+            autoFocus
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Type to search…"
+            aria-label="Search variables"
+          />
+        </div>
+        <div className={styles.varPickerBody}>
+          {filtered.length === 0 ? (
+            <div className={styles.varPickerEmpty}>No variables match.</div>
+          ) : (
+            groupOrder.map((group) => {
+              const items = filtered.filter((v) => v.group === group);
+              if (items.length === 0) return null;
+              return (
+                <div key={group} className={styles.varPickerSection}>
+                  <div className={styles.varPickerSectionTitle}>
+                    {GROUP_TITLES[group]}
+                  </div>
+                  {items.map((v) => (
+                    <button
+                      key={v.key}
+                      className={styles.varPickerItem}
+                      onClick={() => onPick(v.key)}
+                    >
+                      <span className={styles.varPickerItemIcon} aria-hidden>
+                        <GroupIcon group={v.group} />
+                      </span>
+                      <span className={styles.varPickerItemLabel}>{v.label}</span>
+                      <span className={styles.varPickerItemKey}>{v.key}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </>,
+    document.body,
   );
 }
 
@@ -602,34 +739,3 @@ function Segmented<T extends string>({
   );
 }
 
-/* ───────────────────────────────────────────────────────────────── */
-
-function VariableReference({ variables }: { variables: AvailableVariable[] }) {
-  const groups: { title: string; group: AvailableVariable['group'] }[] = [
-    { title: 'Score', group: 'score' },
-    { title: 'Page', group: 'page' },
-    { title: 'Answers', group: 'answer' },
-    { title: 'Lead fields', group: 'lead' },
-  ];
-  return (
-    <div className={styles.inspectorSection}>
-      <h4 className={styles.inspectorSectionTitle}>Available variables</h4>
-      {groups.map((g) => {
-        const items = variables.filter((v) => v.group === g.group);
-        if (items.length === 0) return null;
-        return (
-          <div key={g.group} className={styles.varGroup}>
-            <span className={styles.varGroupTitle}>{g.title}</span>
-            <div>
-              {items.map((v) => (
-                <span key={v.key} className={styles.varListChip} title={v.key}>
-                  {v.label}
-                </span>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
