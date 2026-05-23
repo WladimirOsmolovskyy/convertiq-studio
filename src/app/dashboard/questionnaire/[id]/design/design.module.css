@@ -1,0 +1,360 @@
+/* ─── Design tab shell ────────────────────────────────────────────
+ *  Two-column layout: left panel (Variables OR Inspector, tab-driven),
+ *  right pane (live preview, unchanged).
+ *
+ *  Visual language is borrowed from the Result page editor's inspector
+ *  (`result.module.css`) to keep the editor surface area consistent —
+ *  light surface, separator borders, uppercase section titles,
+ *  segmented controls.
+ */
+
+.shell {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.leftPanel {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-elevated, var(--bg-secondary));
+  border-right: 1px solid var(--separator);
+  min-height: 0;
+}
+
+/* ─── Tab strip ────────────────────────────────────────────────── */
+.tabStrip {
+  display: flex;
+  padding: 0.5rem 0.5rem 0;
+  gap: 0.25rem;
+  background: var(--surface-elevated, var(--bg-secondary));
+  border-bottom: 1px solid var(--separator);
+  flex-shrink: 0;
+}
+
+.tabBtn {
+  flex: 1;
+  padding: 0.4375rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  letter-spacing: -0.008em;
+  margin-bottom: -1px;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+.tabBtn:hover { color: var(--text); }
+.tabBtnActive {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.panelBody {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ─── Inspector — top alignment row ───────────────────────────── */
+.alignRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--separator);
+}
+.alignBtn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.alignBtn:hover:not(:disabled) {
+  background: var(--fill-quaternary);
+  color: var(--text);
+}
+.alignDivider {
+  width: 1px;
+  height: 18px;
+  background: var(--separator);
+  margin: 0 0.25rem;
+}
+
+/* ─── Inspector — header (selected element) ───────────────────── */
+.selectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--separator);
+}
+.selectionDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.selectionLabel {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.008em;
+}
+.selectionScope {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* ─── Inspector — sections (mirrors result inspector pattern) ─── */
+.section {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--separator);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.sectionTitle {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.008em;
+  margin: 0;
+}
+.sectionAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.sectionAction:hover:not(:disabled) {
+  background: var(--fill-quaternary);
+  color: var(--text);
+}
+
+/* ─── Field rows (label + control) ────────────────────────────── */
+.field {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+.fieldStacked {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+}
+.fieldLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  letter-spacing: -0.005em;
+  min-width: 0;
+}
+
+/** Tiny "+ bind to variable" button. Sits to the LEFT of a field's
+ *  label per the reference screenshots. */
+.bindBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.bindBtn:hover:not(:disabled) {
+  background: var(--accent-muted, rgba(0, 122, 255, 0.12));
+}
+
+/* ─── Controls ─────────────────────────────────────────────────── */
+.input {
+  width: 100%;
+  padding: 0.3125rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.75rem;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.inputMuted::placeholder { color: var(--text-muted); }
+
+/** Compact number+unit combo: a number input and a small unit dropdown
+ *  share one bordered surface. */
+.numUnit {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.numUnit > input {
+  background: transparent;
+  border: none;
+  padding: 0.3125rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text);
+  min-width: 0;
+  font-family: inherit;
+}
+.numUnit > input:focus { outline: none; }
+.numUnit > select {
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--separator);
+  padding: 0 0.5rem;
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+}
+.numUnit > select:focus { outline: none; }
+
+.segmented {
+  display: flex;
+  background: var(--fill-quaternary);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+.segmentedBtn {
+  flex: 1;
+  padding: 0.3125rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-sm) - 1px);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  font-family: inherit;
+}
+.segmentedBtnActive {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/** Color/asset swatch pattern: small square + "Add..." placeholder text
+ *  in one bordered cell. Matches the screenshot's Fill/Border/Shadows. */
+.swatchInput {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.5rem 0.25rem 0.25rem;
+}
+.swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: linear-gradient(45deg, #e0e0e0 25%, transparent 25%) -3px 0,
+              linear-gradient(-45deg, #e0e0e0 25%, transparent 25%) -3px 0,
+              linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+              linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+  background-size: 8px 8px;
+  background-color: #fff;
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.swatchPlaceholder {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Slider next to a number input */
+.sliderRow {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+.slider {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--fill-quaternary);
+  outline: none;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+}
+
+/** Greyed/disabled section overlay — used for sections we haven't wired
+ *  yet. The inputs themselves are also `disabled`; this dims the visual
+ *  weight so it's clear they're stubs. */
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ─── Empty state (no selection in Inspector tab) ─────────────── */
+.emptyState {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+/* ─── Variables panel — re-uses editor.module.css design controls;
+ *  this just provides the surrounding container. */
+.variablesBody {
+  padding: 1.25rem 1.25rem;
+}
