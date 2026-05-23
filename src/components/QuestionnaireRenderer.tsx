@@ -327,7 +327,6 @@ export default function QuestionnaireRenderer({
             user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
             host: typeof window !== 'undefined' ? window.location.hostname : null,
             lead_fields: leadFieldValues,
-            webhook_payload: payload,
           },
         });
 
@@ -354,6 +353,15 @@ export default function QuestionnaireRenderer({
             };
           });
           await supabase.from('response_answers').insert(answerRows);
+
+          // Fire-and-forget webhook delivery. The fire endpoint logs
+          // per-destination status; we don't block the visitor on it.
+          void fetch('/api/lead-webhooks/fire', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ response_id: responseId, payload }),
+            keepalive: true,
+          }).catch(() => {});
         }
       } catch (err) {
         console.error('Failed to save response:', err);
