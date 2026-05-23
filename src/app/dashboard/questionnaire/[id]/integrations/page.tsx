@@ -26,43 +26,62 @@ export default function IntegrationsPage({ params }: { params: Promise<{ id: str
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSample, setShowSample] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
     fetch(`/api/lead-webhooks?questionnaire_id=${questionnaireId}`)
-      .then((r) => r.json())
-      .then((data) => {
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
         if (!alive) return;
-        setWebhooks(data.webhooks ?? []);
+        if (!r.ok) {
+          setError(body.error ?? `Failed to load (${r.status})`);
+        } else {
+          setWebhooks(body.webhooks ?? []);
+        }
         setLoading(false);
       })
-      .catch(() => alive && setLoading(false));
+      .catch((e) => {
+        if (!alive) return;
+        setError(String(e));
+        setLoading(false);
+      });
     return () => {
       alive = false;
     };
   }, [questionnaireId]);
 
   const addWebhook = async () => {
+    setError(null);
     const res = await fetch('/api/lead-webhooks', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ questionnaire_id: questionnaireId, url: 'https://', label: '' }),
+      body: JSON.stringify({ questionnaire_id: questionnaireId, url: '', label: '', enabled: false }),
     });
-    if (!res.ok) return;
-    const { webhook } = await res.json();
-    setWebhooks((prev) => [...prev, webhook]);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(body.error ?? `Failed to add destination (${res.status})`);
+      return;
+    }
+    setWebhooks((prev) => [...prev, body.webhook]);
   };
 
   const updateWebhook = async (id: string, patch: Partial<Pick<Webhook, 'url' | 'label' | 'enabled'>>) => {
+    setError(null);
     setWebhooks((prev) => prev.map((w) => (w.id === id ? { ...w, ...patch } : w)));
-    await fetch(`/api/lead-webhooks/${id}`, {
+    const res = await fetch(`/api/lead-webhooks/${id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(patch),
     });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error ?? `Update failed (${res.status})`);
+    }
   };
 
   const removeWebhook = async (id: string) => {
+    setError(null);
     setWebhooks((prev) => prev.filter((w) => w.id !== id));
     await fetch(`/api/lead-webhooks/${id}`, { method: 'DELETE' });
   };
@@ -120,6 +139,23 @@ export default function IntegrationsPage({ params }: { params: Promise<{ id: str
             Each enabled destination receives a POST with the payload below as soon as a lead
             completes the questionnaire. Disabled destinations are skipped.
           </p>
+
+          {error && (
+            <div
+              style={{
+                padding: '0.75rem 0.875rem',
+                marginBottom: '0.75rem',
+                background: 'rgba(255, 59, 48, 0.08)',
+                border: '1px solid rgba(255, 59, 48, 0.3)',
+                borderRadius: 'var(--radius-md)',
+                color: 'var(--danger, #ff3b30)',
+                fontSize: '0.8125rem',
+                lineHeight: 1.45,
+              }}
+            >
+              {error}
+            </div>
+          )}
 
           {loading ? (
             <div style={{ padding: '1rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Loading…</div>
@@ -267,14 +303,17 @@ function WebhookRow({
             gap: '0.375rem',
             fontSize: '0.75rem',
             color: 'var(--text-secondary)',
-            cursor: 'pointer',
+            cursor: webhook.url.trim() ? 'pointer' : 'not-allowed',
             whiteSpace: 'nowrap',
             paddingInline: '0.5rem',
+            opacity: webhook.url.trim() ? 1 : 0.5,
           }}
+          title={webhook.url.trim() ? '' : 'Add a URL first'}
         >
           <input
             type="checkbox"
             checked={webhook.enabled}
+            disabled={!webhook.url.trim()}
             onChange={(e) => onChange({ enabled: e.target.checked })}
           />
           Enabled

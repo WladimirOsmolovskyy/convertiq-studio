@@ -31,10 +31,14 @@ export async function PATCH(
     enabled?: boolean;
   };
   if (url !== undefined) {
-    if (typeof url !== 'string' || !isValidHttpUrl(url)) {
-      return NextResponse.json({ error: 'Valid http(s) URL required' }, { status: 400 });
+    if (typeof url !== 'string') {
+      return NextResponse.json({ error: 'Invalid url' }, { status: 400 });
     }
-    patch.url = url.trim();
+    const trimmedUrl = url.trim();
+    if (trimmedUrl && !isValidHttpUrl(trimmedUrl)) {
+      return NextResponse.json({ error: 'URL must start with http:// or https://' }, { status: 400 });
+    }
+    patch.url = trimmedUrl;
   }
   if (label !== undefined) {
     patch.label = typeof label === 'string' ? label.trim() || null : null;

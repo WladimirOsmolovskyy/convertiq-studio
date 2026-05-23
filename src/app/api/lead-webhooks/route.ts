@@ -52,17 +52,20 @@ export async function POST(request: Request) {
   if (!questionnaire_id || typeof questionnaire_id !== 'string') {
     return NextResponse.json({ error: 'questionnaire_id required' }, { status: 400 });
   }
-  if (!url || typeof url !== 'string' || !isValidHttpUrl(url)) {
-    return NextResponse.json({ error: 'Valid http(s) URL required' }, { status: 400 });
+  // Empty URL is allowed at creation so the row can be edited inline.
+  // The renderer's fire-and-forget call uses `enabled`, not URL presence.
+  const trimmedUrl = typeof url === 'string' ? url.trim() : '';
+  if (trimmedUrl && !isValidHttpUrl(trimmedUrl)) {
+    return NextResponse.json({ error: 'URL must start with http:// or https://' }, { status: 400 });
   }
 
   const { data, error } = await supabase
     .from('lead_webhooks')
     .insert({
       questionnaire_id,
-      url: url.trim(),
+      url: trimmedUrl,
       label: typeof label === 'string' ? label.trim() || null : null,
-      enabled: enabled === false ? false : true,
+      enabled: enabled === true,
     })
     .select()
     .single();
