@@ -72,7 +72,7 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
 
   if (!questionnaire) notFound();
 
-  const [questionsRes, designRes, resultsRes, templateRes] = await Promise.all([
+  const [questionsRes, designRes, resultsRes, templateRes, audiencesRes] = await Promise.all([
     supabase.from('questions').select('*').eq('questionnaire_id', questionnaire.id).order('sort_order'),
     supabase.from('questionnaire_designs').select('config').eq('questionnaire_id', questionnaire.id).single(),
     supabase.from('result_pages').select('*').eq('questionnaire_id', questionnaire.id).order('sort_order'),
@@ -83,7 +83,37 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
           .eq('id', questionnaire.lead_field_template_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase
+      .from('questionnaire_audiences')
+      .select('*, questionnaire_audience_score_ranges(*)')
+      .eq('questionnaire_id', questionnaire.id)
+      .order('sort_order'),
   ]);
+
+  type AudienceRow = {
+    id: string;
+    questionnaire_id: string;
+    name: string;
+    color: string | null;
+    sort_order: number;
+    questionnaire_audience_score_ranges: Array<{
+      id: string;
+      audience_id: string;
+      min_score: number | null;
+      max_score: number | null;
+      sort_order: number;
+    }>;
+  };
+  const audiences = ((audiencesRes.data ?? []) as AudienceRow[]).map((a) => ({
+    id: a.id,
+    questionnaire_id: a.questionnaire_id,
+    name: a.name,
+    color: a.color,
+    sort_order: a.sort_order,
+    score_ranges: [...(a.questionnaire_audience_score_ranges ?? [])].sort(
+      (x, y) => x.sort_order - y.sort_order,
+    ),
+  }));
 
   const questions = questionsRes.data || [];
   const questionIds = questions.map((q: { id: string }) => q.id);
@@ -109,6 +139,7 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
       scoringRules={scoringRes.data || []}
       resultPages={resultsRes.data || []}
       design={design}
+      audiences={audiences}
       templateLeadFields={templateRes.data?.fields ?? []}
     />
   );

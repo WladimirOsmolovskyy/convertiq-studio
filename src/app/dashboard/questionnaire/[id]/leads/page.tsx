@@ -11,10 +11,13 @@ type ResponseRow = {
   id: string;
   session_id: string;
   total_score: number | null;
+  audience_id: string | null;
   started_at: string;
   completed_at: string | null;
   metadata: Record<string, unknown> | null;
 };
+
+type AudienceRow = { id: string; name: string; color: string | null };
 
 function pickFieldByLabel(fields: LeadField[], re: RegExp): LeadField | undefined {
   return fields.find((f) => re.test(f.label || ''));
@@ -31,6 +34,7 @@ type Lead = {
   name: string | null;
   email: string | null;
   score: number | null;
+  audience: AudienceRow | null;
   started_at: string;
   completed_at: string | null;
   durationMs: number | null;
@@ -46,7 +50,7 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
     const load = async () => {
       const supabase = createClient();
 
-      const [questionsRes, qRes] = await Promise.all([
+      const [questionsRes, qRes, audiencesRes] = await Promise.all([
         supabase
           .from('questions')
           .select('id, type, title, sort_order')
@@ -57,7 +61,14 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
           .select('lead_fields, template:lead_field_templates(fields)')
           .eq('id', id)
           .maybeSingle(),
+        supabase
+          .from('questionnaire_audiences')
+          .select('id, name, color')
+          .eq('questionnaire_id', id),
       ]);
+      const audienceMap = new Map<string, AudienceRow>(
+        ((audiencesRes.data ?? []) as AudienceRow[]).map((a) => [a.id, a]),
+      );
       const questions = (questionsRes.data || []) as Pick<Question, 'id' | 'type' | 'title'>[];
 
       const templateFields = (() => {
@@ -80,7 +91,7 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
 
       const responsesRes = await supabase
         .from('responses')
-        .select('id, session_id, total_score, started_at, completed_at, metadata')
+        .select('id, session_id, total_score, audience_id, started_at, completed_at, metadata')
         .eq('questionnaire_id', id)
         .order('started_at', { ascending: false });
       const responses = (responsesRes.data || []) as ResponseRow[];
@@ -136,6 +147,7 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
           name,
           email,
           score: r.total_score,
+          audience: r.audience_id ? audienceMap.get(r.audience_id) ?? null : null,
           started_at: r.started_at,
           completed_at: r.completed_at,
           durationMs,
@@ -203,6 +215,7 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
           <div className={styles.cell}>Email</div>
           <div className={styles.cell}>Date</div>
           <div className={styles.cell}>Duration</div>
+          <div className={styles.cell}>Audience</div>
           <div className={`${styles.cell} ${styles.cellRight}`}>Score</div>
         </div>
         {leads.map((lead) => (
@@ -217,6 +230,25 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
             </div>
             <div className={styles.cell}>{formatDate(lead.started_at)}</div>
             <div className={styles.cell}>{formatDuration(lead.durationMs)}</div>
+            <div className={styles.cell}>
+              {lead.audience ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: lead.audience.color ?? 'var(--text-muted)',
+                      display: 'inline-block',
+                    }}
+                  />
+                  {lead.audience.name}
+                </span>
+              ) : (
+                <span className={styles.dim}>——</span>
+              )}
+            </div>
             <div className={`${styles.cell} ${styles.cellRight}`}>
               {lead.score !== null ? (
                 <span className="badge badge-accent">{lead.score}</span>

@@ -7,6 +7,7 @@ import { resolveLeadFields } from '@/lib/leadFields';
 import type { LeadField, LeadFieldTemplate } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { ChevronLeft, Plus, Trash2, RefreshCw, LogOut, Check } from 'lucide-react';
+import AudienceFilter from '@/components/AudienceFilter';
 import styles from '../../editor.module.css';
 
 interface ConnectionStatus {
@@ -37,6 +38,9 @@ interface IntegrationConfig {
   /** Tag name (not id) — GHL's contact upsert takes names. */
   finished_tag?: string | null;
   field_map?: FieldMapEntry[];
+  /** Allow-list. `undefined` = no filter. `[]` = deliver none.
+   *  Populated = deliver only matching audiences. */
+  audience_ids?: string[];
 }
 
 // GHL standard contact fields available for mapping. Extend here.
@@ -57,7 +61,7 @@ const GHL_STANDARD_FIELDS: { value: string; label: string }[] = [
 
 export default function GoHighLevelPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: questionnaireId } = use(params);
-  const { questionnaire } = useQuestionnaireStore();
+  const { questionnaire, audiences } = useQuestionnaireStore();
 
   const [status, setStatus] = useState<ConnectionStatus>({
     connected: false,
@@ -67,7 +71,7 @@ export default function GoHighLevelPage({ params }: { params: Promise<{ id: stri
   const [tags, setTags] = useState<GhlTag[]>([]);
   const [customFields, setCustomFields] = useState<GhlCustomField[]>([]);
   const [templateFields, setTemplateFields] = useState<LeadField[]>([]);
-  const [config, setConfig] = useState<IntegrationConfig>({ enabled: false, finished_tag: null, field_map: [] });
+  const [config, setConfig] = useState<IntegrationConfig>({ enabled: false, finished_tag: null, field_map: [], audience_ids: undefined });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +112,9 @@ export default function GoHighLevelPage({ params }: { params: Promise<{ id: stri
           enabled: configRes.integration.enabled,
           finished_tag: configRes.integration.config?.finished_tag ?? null,
           field_map: configRes.integration.config?.field_map ?? [],
+          audience_ids: Array.isArray(configRes.integration.config?.audience_ids)
+            ? configRes.integration.config.audience_ids
+            : undefined,
         });
       }
       if (questionnaire?.lead_field_template_id) {
@@ -202,6 +209,7 @@ export default function GoHighLevelPage({ params }: { params: Promise<{ id: stri
         config: {
           finished_tag: config.finished_tag ?? null,
           field_map: (config.field_map ?? []).filter((r) => r.source && r.target),
+          ...(Array.isArray(config.audience_ids) ? { audience_ids: config.audience_ids } : {}),
         },
       }),
     });
@@ -372,6 +380,19 @@ export default function GoHighLevelPage({ params }: { params: Promise<{ id: stri
                   />
                   Enabled for this questionnaire
                 </label>
+              </Field>
+
+              <Field label="Audiences">
+                <AudienceFilter
+                  audiences={audiences}
+                  value={Array.isArray(config.audience_ids) ? config.audience_ids : null}
+                  onChange={(next) =>
+                    setConfig((c) => ({
+                      ...c,
+                      audience_ids: next === null ? undefined : next,
+                    }))
+                  }
+                />
               </Field>
             </Section>
 

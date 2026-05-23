@@ -30,11 +30,16 @@ export default function EditorLayout({
     const loadData = async () => {
       const supabase = createClient();
 
-      const [qRes, questionsRes, resultsRes, designRes] = await Promise.all([
+      const [qRes, questionsRes, resultsRes, designRes, audiencesRes] = await Promise.all([
         supabase.from('questionnaires').select('*').eq('id', id).single(),
         supabase.from('questions').select('*').eq('questionnaire_id', id).order('sort_order'),
         supabase.from('result_pages').select('*').eq('questionnaire_id', id).order('sort_order'),
         supabase.from('questionnaire_designs').select('*').eq('questionnaire_id', id).single(),
+        supabase
+          .from('questionnaire_audiences')
+          .select('*, questionnaire_audience_score_ranges(*)')
+          .eq('questionnaire_id', id)
+          .order('sort_order'),
       ]);
 
       if (qRes.data) {
@@ -46,6 +51,31 @@ export default function EditorLayout({
           ? await supabase.from('scoring_rules').select('*').in('question_id', questionIds)
           : { data: [] };
 
+        type AudienceRow = {
+          id: string;
+          questionnaire_id: string;
+          name: string;
+          color: string | null;
+          sort_order: number;
+          questionnaire_audience_score_ranges: Array<{
+            id: string;
+            audience_id: string;
+            min_score: number | null;
+            max_score: number | null;
+            sort_order: number;
+          }>;
+        };
+        const audiences = ((audiencesRes.data ?? []) as AudienceRow[]).map((a) => ({
+          id: a.id,
+          questionnaire_id: a.questionnaire_id,
+          name: a.name,
+          color: a.color,
+          sort_order: a.sort_order,
+          score_ranges: [...(a.questionnaire_audience_score_ranges ?? [])].sort(
+            (x, y) => x.sort_order - y.sort_order,
+          ),
+        }));
+
         useQuestionnaireStore.getState().hydrate({
           questionnaire: qRes.data,
           questions: questionsRes.data || [],
@@ -55,6 +85,7 @@ export default function EditorLayout({
           design: designRes.data?.config && Object.keys(designRes.data.config).length > 0
             ? { ...defaultDesign, ...designRes.data.config }
             : defaultDesign,
+          audiences,
         });
       }
       setLoaded(true);

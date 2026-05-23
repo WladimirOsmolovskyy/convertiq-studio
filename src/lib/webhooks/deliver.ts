@@ -8,6 +8,10 @@ type AdminClient = ReturnType<typeof createAdminClient>;
 interface WebhookRow {
   id: string;
   url: string;
+  /** Audience allow-list. NULL = no filter, deliver all. Empty array =
+   *  deliver none. Populated = deliver only when the lead's audience
+   *  is in the list. */
+  audience_ids: string[] | null;
 }
 
 export async function deliverToWebhooks(
@@ -17,14 +21,22 @@ export async function deliverToWebhooks(
   const admin = createAdminClient();
   const { data: hooks } = await admin
     .from('lead_webhooks')
-    .select('id, url')
+    .select('id, url, audience_ids')
     .eq('questionnaire_id', questionnaireId)
     .eq('enabled', true);
 
   const rows = (hooks ?? []) as WebhookRow[];
   if (rows.length === 0) return;
 
-  await Promise.allSettled(rows.map((h) => deliverOne(admin, h, payload)));
+  const leadAudienceId = payload.lead.audience?.id ?? null;
+  const eligible = rows.filter((h) => {
+    if (h.audience_ids == null) return true;
+    if (!leadAudienceId) return false;
+    return h.audience_ids.includes(leadAudienceId);
+  });
+  if (eligible.length === 0) return;
+
+  await Promise.allSettled(eligible.map((h) => deliverOne(admin, h, payload)));
 }
 
 async function deliverOne(

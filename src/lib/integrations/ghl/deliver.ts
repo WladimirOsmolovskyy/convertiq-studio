@@ -10,6 +10,10 @@ interface FieldMapEntry {
 interface GhlConfig {
   finished_tag?: string | null;
   field_map?: FieldMapEntry[];
+  /** Audience allow-list. `undefined` = no filter, deliver all (default).
+   *  `[]` = deliver none. Populated = deliver only when the lead's
+   *  audience is in the list. */
+  audience_ids?: string[];
 }
 
 // Standard GHL contact fields we accept as map targets. Anything
@@ -74,6 +78,17 @@ export async function deliverToGhl(
   }
 
   const config = (integration.config ?? {}) as GhlConfig;
+
+  // Audience allow-list filter. `undefined` = no filter. Empty or
+  // non-matching = skip silently (don't write an error — this is a
+  // configured choice, not a failure).
+  if (Array.isArray(config.audience_ids)) {
+    const audienceId = payload.lead.audience?.id ?? null;
+    if (!audienceId || !config.audience_ids.includes(audienceId)) {
+      return;
+    }
+  }
+
   const input = buildUpsertInput(payload, config);
 
   // Need at least one identifier (GHL rejects otherwise). If the

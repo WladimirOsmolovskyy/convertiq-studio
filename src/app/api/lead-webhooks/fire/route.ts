@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   const { data: response } = await admin
     .from('responses')
-    .select('id, questionnaire_id')
+    .select('id, questionnaire_id, audience_id')
     .eq('id', response_id)
     .single();
 
@@ -37,12 +37,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unknown response' }, { status: 404 });
   }
 
-  // Pin the payload's identity to the saved response so a tampered
-  // client can't fire under one questionnaire's destinations with a
-  // payload claiming a different lead/questionnaire.
+  // Pin the payload's identity (and audience) to the saved response so a
+  // tampered client can't fire under one questionnaire's destinations
+  // with a payload claiming a different lead, questionnaire, or audience.
+  let stampedAudience: LeadPayload['lead']['audience'] = null;
+  if (response.audience_id) {
+    const { data: audience } = await admin
+      .from('questionnaire_audiences')
+      .select('id, name, color')
+      .eq('id', response.audience_id)
+      .maybeSingle();
+    if (audience) {
+      stampedAudience = { id: audience.id, name: audience.name, color: audience.color };
+    }
+  }
+
   const stamped: LeadPayload = {
     ...payload,
-    lead: { ...payload.lead, id: response.id },
+    lead: { ...payload.lead, id: response.id, audience: stampedAudience },
     questionnaire: { ...payload.questionnaire, id: response.questionnaire_id },
   };
 

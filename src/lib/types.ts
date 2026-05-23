@@ -14,6 +14,11 @@ export interface QuestionOption {
   id: string;
   label: string;
   value: string;
+  /** When true, selecting this option counts toward the questionnaire's
+   *  red-flag total. If the total reaches the questionnaire's
+   *  `red_flag_threshold`, the lead is routed to
+   *  `red_flag_audience_id`. */
+  is_red_flag?: boolean;
 }
 
 export interface Question {
@@ -506,8 +511,34 @@ export interface Questionnaire {
   /** Optional FK to a project-scoped LeadFieldTemplate. When set, the template's
    *  fields are merged with this questionnaire's lead_fields at runtime. */
   lead_field_template_id: string | null;
+  /** When a response's red-flag option count reaches this threshold,
+   *  the lead is placed in `red_flag_audience_id`. Null disables the rule. */
+  red_flag_threshold: number | null;
+  red_flag_audience_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/* ─── Audiences ─────────────────────────────────────────────────── */
+
+/** Inclusive numeric range. Null bounds mean unbounded on that side. */
+export interface AudienceScoreRange {
+  id: string;
+  audience_id: string;
+  min_score: number | null;
+  max_score: number | null;
+  sort_order: number;
+}
+
+export interface Audience {
+  id: string;
+  questionnaire_id: string;
+  name: string;
+  color: string | null;
+  sort_order: number;
+  /** Nested score ranges. Populated when audiences are loaded with their
+   *  ranges joined; empty array when there are no ranges configured. */
+  score_ranges: AudienceScoreRange[];
 }
 
 /* ─── Responses ─────────────────────────────────────────────────── */
@@ -518,6 +549,7 @@ export interface Response {
   session_id: string;
   total_score: number | null;
   result_id: string | null;
+  audience_id: string | null;
   started_at: string;
   completed_at: string | null;
   metadata: Record<string, unknown>;

@@ -16,6 +16,7 @@ import {
   X,
   Plus,
   FileText,
+  Flag,
 } from 'lucide-react';
 import styles from '../editor.module.css';
 
@@ -42,6 +43,7 @@ export default function ContentEditor() {
     removeQuestion,
     addOption,
     updateOption,
+    toggleOptionRedFlag,
     removeOption,
     scoringRules,
     updateScoringRule,
@@ -144,6 +146,23 @@ export default function ContentEditor() {
                         aria-label="Points for option"
                       />
                       <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>pts</span>
+                      <button
+                        className={styles.removeBtn}
+                        onClick={() => toggleOptionRedFlag(q.id, opt.id)}
+                        title={opt.is_red_flag ? 'Red flag — click to clear' : 'Mark as red flag'}
+                        aria-label={opt.is_red_flag ? 'Clear red flag' : 'Mark as red flag'}
+                        aria-pressed={!!opt.is_red_flag}
+                        style={{
+                          color: opt.is_red_flag ? 'var(--danger, #ff3b30)' : 'var(--text-muted)',
+                          background: opt.is_red_flag ? 'rgba(255, 59, 48, 0.1)' : undefined,
+                        }}
+                      >
+                        <Flag
+                          size={14}
+                          strokeWidth={opt.is_red_flag ? 2.25 : 1.75}
+                          fill={opt.is_red_flag ? 'currentColor' : 'none'}
+                        />
+                      </button>
                       <button
                         className={styles.removeBtn}
                         onClick={() => removeOption(q.id, opt.id)}

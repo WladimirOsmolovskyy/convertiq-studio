@@ -22,6 +22,7 @@ export default function PreviewPage() {
       scoringRules={store.scoringRules}
       resultPages={store.resultPages}
       design={store.design}
+      audiences={store.audiences}
     />
   );
 }
