@@ -102,15 +102,3 @@ CREATE INDEX IF NOT EXISTS idx_responses_audience_id ON responses(audience_id);
 
 ALTER TABLE lead_webhooks
   ADD COLUMN IF NOT EXISTS audience_ids UUID[];
-
--- Allow questionnaire owners to UPDATE their responses so the editor
--- can recompute audience_id when the audience config changes.
-DROP POLICY IF EXISTS "Owners can update responses" ON responses;
-CREATE POLICY "Owners can update responses"
-  ON responses FOR UPDATE
-  USING (
-    questionnaire_id IN (SELECT id FROM questionnaires WHERE user_id = auth.uid())
-  )
-  WITH CHECK (
-    questionnaire_id IN (SELECT id FROM questionnaires WHERE user_id = auth.uid())
-  );
