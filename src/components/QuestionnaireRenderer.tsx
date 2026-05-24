@@ -544,7 +544,10 @@ export default function QuestionnaireRenderer({
                 <div
                   className={`${styles.progressWrap} ${sel.className}`.trim()}
                   onClick={sel.onClick}
-                  style={elementOverrideStyle(design, 'progress')}
+                  style={{
+                    marginBottom: `${design.layout.questionSpacing}rem`,
+                    ...elementOverrideStyle(design, 'progress'),
+                  }}
                 >
                   <div className={styles.progressLabel} style={{ color: design.colors.textMuted }}>
                     <span>{questionnaire.title}</span>
@@ -889,7 +892,7 @@ export default function QuestionnaireRenderer({
             })()}
 
             {/* Navigation */}
-            <div className={styles.navButtons}>
+            <div className={styles.navButtons} style={{ marginTop: `${design.layout.questionSpacing}rem` }}>
               <button
                 className={styles.backBtn}
                 onClick={() => {
