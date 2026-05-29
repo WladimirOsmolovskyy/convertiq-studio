@@ -18,6 +18,7 @@ import {
   appendChild,
   deleteNode,
   moveNodeToFrame,
+  moveNodeToIndex,
   moveNodeWithinParent,
   patchNode,
 } from '@/lib/resultPage';
@@ -89,6 +90,14 @@ interface QuestionnaireState {
   /** Reparent a node to be the last child of `parentNodeId`. No-op for
    *  cycles or invalid targets. */
   moveResultPageNodeTo: (pageId: string, nodeId: string, parentNodeId: string) => void;
+  /** Reparent a node to a precise index in target parent's children.
+   *  Same cycle/target validation as moveResultPageNodeTo. */
+  moveResultPageNodeAt: (
+    pageId: string,
+    nodeId: string,
+    parentNodeId: string,
+    index: number,
+  ) => void;
   updateTitle: (title: string) => void;
   updateSlug: (slug: string) => void;
   setDomain: (domainId: string | null) => void;
@@ -364,6 +373,16 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
       resultPages: get().resultPages.map((p) =>
         p.id === pageId
           ? { ...p, content: moveNodeToFrame(p.content, nodeId, parentNodeId) }
+          : p,
+      ),
+      isDirty: true,
+    }),
+
+  moveResultPageNodeAt: (pageId, nodeId, parentNodeId, index) =>
+    set({
+      resultPages: get().resultPages.map((p) =>
+        p.id === pageId
+          ? { ...p, content: moveNodeToIndex(p.content, nodeId, parentNodeId, index) }
           : p,
       ),
       isDirty: true,

@@ -94,6 +94,30 @@ export function appendChild(
   };
 }
 
+/** Insert a node at a specific index in a target frame's children.
+ *  Index is clamped to [0, children.length]. If parentId doesn't resolve
+ *  to a frame, returns the tree unchanged. */
+export function insertChildAt(
+  root: ResultFrameNode,
+  parentId: string,
+  index: number,
+  node: ResultNode,
+): ResultFrameNode {
+  if (root.id === parentId) {
+    const i = Math.max(0, Math.min(index, root.children.length));
+    const next = [...root.children];
+    next.splice(i, 0, node);
+    return { ...root, children: next };
+  }
+  return {
+    ...root,
+    children: root.children.map((child) => {
+      if (child.type === 'frame') return insertChildAt(child, parentId, index, node);
+      return child;
+    }),
+  };
+}
+
 /** Remove a node by id from anywhere in the tree. Returns the tree
  *  unchanged if the id is the root (you can't delete the root). */
 export function deleteNode(root: ResultFrameNode, id: string): ResultFrameNode {
@@ -240,6 +264,42 @@ export function moveNodeToFrame(
   if (!listValidMoveTargets(root, nodeId).includes(targetParentId)) return root;
   const detached = deleteNode(root, nodeId);
   return appendChild(detached, targetParentId, node);
+}
+
+/** Detach a node and insert it at a precise index in a target frame's
+ *  children. No-op for cycles, root moves, or non-frame targets. Indexes
+ *  reference the children list AFTER the source has been removed — same
+ *  semantics as splice. */
+export function moveNodeToIndex(
+  root: ResultFrameNode,
+  nodeId: string,
+  targetParentId: string,
+  targetIndex: number,
+): ResultFrameNode {
+  if (nodeId === root.id) return root;
+  const node = findNode(root, nodeId);
+  if (!node) return root;
+
+  // Re-targeting into the same parent is allowed (sibling reorder), but
+  // moving into self or a descendant would cycle.
+  if (nodeId === targetParentId) return root;
+  if (node.type === 'frame') {
+    const descendantIds = new Set<string>();
+    const collect = (frame: ResultFrameNode) => {
+      for (const c of frame.children) {
+        descendantIds.add(c.id);
+        if (c.type === 'frame') collect(c);
+      }
+    };
+    collect(node);
+    if (descendantIds.has(targetParentId)) return root;
+  }
+
+  const target = findNode(root, targetParentId);
+  if (!target || target.type !== 'frame') return root;
+
+  const detached = deleteNode(root, nodeId);
+  return insertChildAt(detached, targetParentId, targetIndex, node);
 }
 
 /** Best-effort projection of a ResultPage to {title, description}.
