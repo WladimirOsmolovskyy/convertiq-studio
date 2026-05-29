@@ -6,6 +6,8 @@ import type {
   ResultPage,
   ResultNode,
   DesignConfig,
+  ElementId,
+  ElementStyles,
   Questionnaire,
   LeadField,
   Audience,
@@ -58,6 +60,9 @@ interface QuestionnaireState {
   setResultPages: (s: ResultPage[]) => void;
   setDesign: (d: DesignConfig) => void;
   updateDesign: (partial: Partial<DesignConfig>) => void;
+  /** Merge a Partial&lt;ElementStyles&gt; into design.elements[id]. Creates
+   *  the override object if missing. Used by the Inspector panel. */
+  updateElementStyle: (elementId: ElementId, partial: Partial<ElementStyles>) => void;
   addQuestion: (type: Question['type']) => void;
   updateQuestion: (id: string, updates: Partial<Question>) => void;
   removeQuestion: (id: string) => void;
@@ -162,6 +167,18 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
           input: { ...c.components.input, ...(partial.components?.input || {}) },
         },
         background: { ...c.background, ...(partial.background || {}) },
+      },
+      isDirty: true,
+    });
+  },
+
+  updateElementStyle: (elementId, partial) => {
+    const c = get().design;
+    const existing = c.elements?.[elementId] ?? {};
+    set({
+      design: {
+        ...c,
+        elements: { ...(c.elements ?? {}), [elementId]: { ...existing, ...partial } },
       },
       isDirty: true,
     });

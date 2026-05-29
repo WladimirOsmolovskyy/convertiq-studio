@@ -29,7 +29,14 @@ type Tab = 'variables' | 'inspector';
 export default function DesignEditor() {
   const store = useQuestionnaireStore();
   const [tab, setTab] = useState<Tab>('variables');
-  const [selectedElementId] = useState<ElementId | null>(null);
+  const [selectedElementId, setSelectedElementId] = useState<ElementId | null>(null);
+
+  // Selecting on the canvas auto-switches to the Inspector tab so the user
+  // sees the relevant properties immediately.
+  const handleSelectElement = (id: ElementId) => {
+    setSelectedElementId(id);
+    setTab('inspector');
+  };
 
   return (
     <div className={styles.shell}>
@@ -68,6 +75,9 @@ export default function DesignEditor() {
             scoringRules={store.scoringRules}
             resultPages={store.resultPages}
             design={store.design}
+            selectableMode
+            selectedElementId={selectedElementId}
+            onSelectElement={handleSelectElement}
           />
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>

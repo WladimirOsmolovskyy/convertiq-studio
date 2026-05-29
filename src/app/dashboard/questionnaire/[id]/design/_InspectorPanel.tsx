@@ -3,15 +3,17 @@
 /**
  * Inspector panel — selection-driven properties for a single element.
  *
- * UI shell (this commit / phase 1):
- *   - Section structure + visual language matches the screenshots the user
- *     provided (Position / Size / Layout / Styles, alignment row, "+" bind-to-
- *     variable buttons next to fields).
- *   - Most controls are DISABLED + greyed out. They render so the design
- *     direction is visible, but won't be wired until Commit C.
- *   - Selection wiring (clicking on the canvas to populate this) lands in
- *     Commit B — for now `selectedElementId` is passed in by the parent and
- *     defaults to 'page'.
+ * Sections + visual language match the user-provided screenshots
+ * (Position / Size / Layout / Styles, alignment row, "+" bind-to-variable
+ * buttons next to fields). Visual styling is borrowed from the Result
+ * editor's inspector to stay consistent with the rest of the app.
+ *
+ * What's wired (Commit C):
+ *   - Fill (background)  → design.elements[id].fill
+ *   - Radius (radius)    → design.elements[id].radius
+ *   - Padding (padding)  → design.elements[id].padding
+ *
+ * Everything else is rendered but disabled — future prompts add the rest.
  */
 
 import {
@@ -22,12 +24,10 @@ import {
   Plus, Minus, Square,
   AlignStartVertical, AlignCenterVertical, AlignEndVertical,
 } from 'lucide-react';
-import type { ElementId } from '@/lib/types';
+import type { ElementId, ElementStyles } from '@/lib/types';
+import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import styles from './design.module.css';
 
-/** Display metadata for each selectable element. Scope is shown as a small
- *  badge in the header so the user knows e.g. "Option" is being edited
- *  inside the Radio question type. */
 const ELEMENT_LABELS: Record<ElementId, { label: string; scope?: string }> = {
   page: { label: 'Page' },
   container: { label: 'Container' },
@@ -52,6 +52,8 @@ interface Props {
 }
 
 export default function InspectorPanel({ selectedElementId }: Props) {
+  const { design, updateElementStyle } = useQuestionnaireStore();
+
   if (!selectedElementId) {
     return (
       <div className={styles.emptyState}>
@@ -63,34 +65,29 @@ export default function InspectorPanel({ selectedElementId }: Props) {
   }
 
   const meta = ELEMENT_LABELS[selectedElementId];
+  const override: ElementStyles = design.elements?.[selectedElementId] ?? {};
+
+  const setStyle = (partial: Partial<ElementStyles>) =>
+    updateElementStyle(selectedElementId, partial);
+
+  // Pull resolved literal values out of overrides. VarRefs ignored (phase 2).
+  const fillValue = typeof override.fill === 'string' ? override.fill : '';
+  const radiusValue = typeof override.radius === 'number' ? override.radius : '';
+  const paddingValue = typeof override.padding === 'number' ? override.padding : '';
 
   return (
     <>
-      {/* Top alignment row — visual only for now */}
-      <div className={`${styles.alignRow} ${styles.disabled}`}>
-        <button type="button" className={styles.alignBtn} aria-label="Align left" disabled>
-          <AlignLeft size={14} strokeWidth={1.75} />
-        </button>
-        <button type="button" className={styles.alignBtn} aria-label="Align center horizontal" disabled>
-          <AlignCenterHorizontal size={14} strokeWidth={1.75} />
-        </button>
-        <button type="button" className={styles.alignBtn} aria-label="Align right" disabled>
-          <AlignRight size={14} strokeWidth={1.75} />
-        </button>
+      {/* Top alignment row — stub */}
+      <div className={styles.alignRow}>
+        <AlignBtn icon={<AlignLeft size={14} strokeWidth={1.75} />} label="Align left" disabled />
+        <AlignBtn icon={<AlignCenterHorizontal size={14} strokeWidth={1.75} />} label="Align center horizontal" disabled />
+        <AlignBtn icon={<AlignRight size={14} strokeWidth={1.75} />} label="Align right" disabled />
         <span className={styles.alignDivider} />
-        <button type="button" className={styles.alignBtn} aria-label="Align top" disabled>
-          <AlignVerticalJustifyStart size={14} strokeWidth={1.75} />
-        </button>
-        <button type="button" className={styles.alignBtn} aria-label="Align middle" disabled>
-          <AlignVerticalJustifyCenter size={14} strokeWidth={1.75} />
-        </button>
-        <button type="button" className={styles.alignBtn} aria-label="Align bottom" disabled>
-          <AlignVerticalJustifyEnd size={14} strokeWidth={1.75} />
-        </button>
+        <AlignBtn icon={<AlignVerticalJustifyStart size={14} strokeWidth={1.75} />} label="Align top" disabled />
+        <AlignBtn icon={<AlignVerticalJustifyCenter size={14} strokeWidth={1.75} />} label="Align middle" disabled />
+        <AlignBtn icon={<AlignVerticalJustifyEnd size={14} strokeWidth={1.75} />} label="Align bottom" disabled />
         <span className={styles.alignDivider} />
-        <button type="button" className={styles.alignBtn} aria-label="Distribute" disabled>
-          <AlignHorizontalSpaceBetween size={14} strokeWidth={1.75} />
-        </button>
+        <AlignBtn icon={<AlignHorizontalSpaceBetween size={14} strokeWidth={1.75} />} label="Distribute" disabled />
       </div>
 
       {/* Selection header */}
@@ -100,19 +97,19 @@ export default function InspectorPanel({ selectedElementId }: Props) {
         {meta.scope && <span className={styles.selectionScope}>in {meta.scope}</span>}
       </div>
 
-      {/* Interactions */}
-      <CollapsibleSection title="Interactions" headerAction="add" disabled />
+      {/* Interactions — header-only stub */}
+      <Section title="Interactions" headerAction="add" />
 
       {/* Link */}
-      <Section title="Link" headerAction="add" disabled>
-        <Field label="Link To" bindable>
+      <Section title="Link" headerAction="add">
+        <Field label="Link To" bindable disabled>
           <input className={styles.input} placeholder="Page or URL..." disabled />
         </Field>
       </Section>
 
       {/* Position */}
-      <Section title="Position" disabled>
-        <Field label="Type">
+      <Section title="Position">
+        <Field label="Type" disabled>
           <select className={styles.input} disabled defaultValue="relative">
             <option value="relative">Relative</option>
             <option value="absolute">Absolute</option>
@@ -122,14 +119,14 @@ export default function InspectorPanel({ selectedElementId }: Props) {
       </Section>
 
       {/* Size */}
-      <Section title="Size" headerAction="add" disabled>
-        <Field label="Width" bindable>
+      <Section title="Size" headerAction="add">
+        <Field label="Width" bindable disabled>
           <NumUnit value="100" unit="rel" units={['rel', 'px', 'fit', 'auto']} disabled />
         </Field>
-        <Field label="Height" bindable>
+        <Field label="Height" bindable disabled>
           <NumUnit value="" placeholder="321" unit="fit" units={['fit', 'px', 'rel', 'auto']} disabled />
         </Field>
-        <Field label="Min Max">
+        <Field label="Min Max" disabled>
           <div className={styles.swatchInput}>
             <ArrowLeftRight size={14} strokeWidth={1.75} color="var(--text-muted)" />
             <span className={styles.swatchPlaceholder}>Add...</span>
@@ -138,24 +135,20 @@ export default function InspectorPanel({ selectedElementId }: Props) {
       </Section>
 
       {/* Layout */}
-      <Section title="Layout" headerAction="collapse" disabled>
-        <Field label="Type">
+      <Section title="Layout" headerAction="collapse">
+        <Field label="Type" disabled>
           <div className={styles.segmented}>
             <button type="button" className={`${styles.segmentedBtn} ${styles.segmentedBtnActive}`} disabled>Stack</button>
             <button type="button" className={styles.segmentedBtn} disabled>Grid</button>
           </div>
         </Field>
-        <Field label="Direction" bindable>
+        <Field label="Direction" bindable disabled>
           <div className={styles.segmented}>
-            <button type="button" className={styles.segmentedBtn} disabled>
-              <ArrowLeftRight size={12} strokeWidth={1.75} />
-            </button>
-            <button type="button" className={`${styles.segmentedBtn} ${styles.segmentedBtnActive}`} disabled>
-              <ArrowUpDown size={12} strokeWidth={1.75} />
-            </button>
+            <button type="button" className={styles.segmentedBtn} disabled><ArrowLeftRight size={12} strokeWidth={1.75} /></button>
+            <button type="button" className={`${styles.segmentedBtn} ${styles.segmentedBtnActive}`} disabled><ArrowUpDown size={12} strokeWidth={1.75} /></button>
           </div>
         </Field>
-        <Field label="Distribute" bindable>
+        <Field label="Distribute" bindable disabled>
           <select className={styles.input} disabled defaultValue="start">
             <option value="start">Start</option>
             <option value="center">Center</option>
@@ -163,67 +156,91 @@ export default function InspectorPanel({ selectedElementId }: Props) {
             <option value="space-between">Space Between</option>
           </select>
         </Field>
-        <Field label="Align" bindable>
+        <Field label="Align" bindable disabled>
           <div className={styles.segmented}>
-            <button type="button" className={styles.segmentedBtn} disabled>
-              <AlignStartVertical size={12} strokeWidth={1.75} />
-            </button>
-            <button type="button" className={`${styles.segmentedBtn} ${styles.segmentedBtnActive}`} disabled>
-              <AlignCenterVertical size={12} strokeWidth={1.75} />
-            </button>
-            <button type="button" className={styles.segmentedBtn} disabled>
-              <AlignEndVertical size={12} strokeWidth={1.75} />
-            </button>
+            <button type="button" className={styles.segmentedBtn} disabled><AlignStartVertical size={12} strokeWidth={1.75} /></button>
+            <button type="button" className={`${styles.segmentedBtn} ${styles.segmentedBtnActive}`} disabled><AlignCenterVertical size={12} strokeWidth={1.75} /></button>
+            <button type="button" className={styles.segmentedBtn} disabled><AlignEndVertical size={12} strokeWidth={1.75} /></button>
           </div>
         </Field>
-        <Field label="Wrap">
+        <Field label="Wrap" disabled>
           <div className={styles.segmented}>
             <button type="button" className={styles.segmentedBtn} disabled>Yes</button>
             <button type="button" className={`${styles.segmentedBtn} ${styles.segmentedBtnActive}`} disabled>No</button>
           </div>
         </Field>
-        <Field label="Gap" bindable>
+        <Field label="Gap" bindable disabled>
           <div className={styles.sliderRow}>
             <input className={styles.input} defaultValue="24" disabled />
             <input type="range" className={styles.slider} min={0} max={64} defaultValue={24} disabled />
           </div>
         </Field>
+        {/* Wired ↓ */}
         <Field label="Padding" bindable>
           <div className={styles.sliderRow}>
-            <input className={styles.input} defaultValue="0" disabled />
-            <div style={{ display: 'flex', gap: '0.25rem' }}>
-              <button type="button" className={`${styles.segmentedBtn} ${styles.segmentedBtnActive}`} disabled style={{ padding: '0.25rem 0.4rem' }}>
-                <Square size={12} strokeWidth={1.75} />
-              </button>
-              <button type="button" className={styles.segmentedBtn} disabled style={{ padding: '0.25rem 0.4rem' }}>
-                <Square size={12} strokeWidth={1.25} />
-              </button>
-            </div>
+            <input
+              type="number"
+              className={styles.input}
+              value={paddingValue}
+              placeholder="0"
+              min={0}
+              step={0.25}
+              onChange={(e) => {
+                const v = e.target.value;
+                setStyle({ padding: v === '' ? undefined : Number(v) });
+              }}
+            />
+            <input
+              type="range"
+              className={styles.slider}
+              min={0}
+              max={4}
+              step={0.125}
+              value={typeof paddingValue === 'number' ? paddingValue : 0}
+              onChange={(e) => setStyle({ padding: Number(e.target.value) })}
+            />
           </div>
         </Field>
       </Section>
 
       {/* Styles */}
-      <Section title="Styles" headerAction="add" disabled>
-        <Field label="Opacity" bindable>
+      <Section title="Styles" headerAction="add">
+        <Field label="Opacity" bindable disabled>
           <div className={styles.sliderRow}>
             <input className={styles.input} defaultValue="1" disabled />
             <input type="range" className={styles.slider} min={0} max={1} step={0.05} defaultValue={1} disabled />
           </div>
         </Field>
-        <Field label="Visible" bindable>
+        <Field label="Visible" bindable disabled>
           <div className={styles.segmented}>
             <button type="button" className={`${styles.segmentedBtn} ${styles.segmentedBtnActive}`} disabled>Yes</button>
             <button type="button" className={styles.segmentedBtn} disabled>No</button>
           </div>
         </Field>
+        {/* Wired ↓ */}
         <Field label="Fill" bindable>
           <div className={styles.swatchInput}>
-            <span className={styles.swatch} />
-            <span className={styles.swatchPlaceholder}>Add...</span>
+            <label
+              className={styles.swatch}
+              style={fillValue ? { background: fillValue, backgroundImage: 'none' } : undefined}
+            >
+              <input
+                type="color"
+                value={typeof fillValue === 'string' && /^#[0-9a-f]{6}$/i.test(fillValue) ? fillValue : '#ffffff'}
+                onChange={(e) => setStyle({ fill: e.target.value })}
+                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+              />
+            </label>
+            <input
+              className={styles.input}
+              style={{ border: 'none', padding: 0, background: 'transparent' }}
+              value={fillValue}
+              placeholder="Add..."
+              onChange={(e) => setStyle({ fill: e.target.value || undefined })}
+            />
           </div>
         </Field>
-        <Field label="Overflow" bindable>
+        <Field label="Overflow" bindable disabled>
           <select className={styles.input} disabled defaultValue="visible">
             <option value="visible">Visible</option>
             <option value="hidden">Hidden</option>
@@ -231,9 +248,20 @@ export default function InspectorPanel({ selectedElementId }: Props) {
             <option value="scroll">Scroll</option>
           </select>
         </Field>
+        {/* Wired ↓ */}
         <Field label="Radius" bindable>
           <div className={styles.sliderRow}>
-            <input className={styles.input} defaultValue="0" disabled />
+            <input
+              type="number"
+              className={styles.input}
+              value={radiusValue}
+              placeholder="0"
+              min={0}
+              onChange={(e) => {
+                const v = e.target.value;
+                setStyle({ radius: v === '' ? undefined : Number(v) });
+              }}
+            />
             <div style={{ display: 'flex', gap: '0.25rem' }}>
               <button type="button" className={`${styles.segmentedBtn} ${styles.segmentedBtnActive}`} disabled style={{ padding: '0.25rem 0.4rem' }}>
                 <Square size={12} strokeWidth={1.75} />
@@ -244,13 +272,13 @@ export default function InspectorPanel({ selectedElementId }: Props) {
             </div>
           </div>
         </Field>
-        <Field label="Border">
+        <Field label="Border" disabled>
           <div className={styles.swatchInput}>
             <span className={styles.swatch} />
             <span className={styles.swatchPlaceholder}>Add...</span>
           </div>
         </Field>
-        <Field label="Shadows">
+        <Field label="Shadows" disabled>
           <div className={styles.swatchInput}>
             <span className={styles.swatch} />
             <span className={styles.swatchPlaceholder}>Add...</span>
@@ -266,13 +294,12 @@ export default function InspectorPanel({ selectedElementId }: Props) {
 interface SectionProps {
   title: string;
   headerAction?: 'add' | 'collapse' | null;
-  disabled?: boolean;
   children?: React.ReactNode;
 }
 
-function Section({ title, headerAction, disabled, children }: SectionProps) {
+function Section({ title, headerAction, children }: SectionProps) {
   return (
-    <div className={`${styles.section} ${disabled ? styles.disabled : ''}`}>
+    <div className={styles.section}>
       <div className={styles.sectionHeader}>
         <h4 className={styles.sectionTitle}>{title}</h4>
         {headerAction === 'add' && (
@@ -291,22 +318,16 @@ function Section({ title, headerAction, disabled, children }: SectionProps) {
   );
 }
 
-/** Like Section but has no body (e.g. "Interactions" in screenshots is just
- *  a header + add affordance until expanded). */
-function CollapsibleSection({ title, headerAction, disabled }: Omit<SectionProps, 'children'>) {
-  return <Section title={title} headerAction={headerAction} disabled={disabled} />;
-}
-
 interface FieldProps {
   label: string;
-  /** Show the small "+" bind-to-variable button to the left of the label. */
   bindable?: boolean;
+  disabled?: boolean;
   children: React.ReactNode;
 }
 
-function Field({ label, bindable, children }: FieldProps) {
+function Field({ label, bindable, disabled, children }: FieldProps) {
   return (
-    <div className={styles.field}>
+    <div className={`${styles.field} ${disabled ? styles.disabled : ''}`.trim()}>
       <span className={styles.fieldLabel}>
         {bindable && (
           <button type="button" className={styles.bindBtn} aria-label={`Bind ${label} to a variable`} disabled>
@@ -320,7 +341,15 @@ function Field({ label, bindable, children }: FieldProps) {
   );
 }
 
-/** Number + unit-dropdown compact input. Stub in phase 1 (read-only). */
+function AlignBtn({ icon, label, disabled }: { icon: React.ReactNode; label: string; disabled?: boolean }) {
+  return (
+    <button type="button" className={styles.alignBtn} aria-label={label} disabled={disabled}>
+      {icon}
+    </button>
+  );
+}
+
+/** Number + unit-dropdown compact input. Stub in phase 1. */
 function NumUnit({
   value, placeholder, unit, units, disabled,
 }: {
