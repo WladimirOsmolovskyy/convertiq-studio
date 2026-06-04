@@ -24,6 +24,7 @@ export default function PreviewPage() {
         scoringRules={store.scoringRules}
         resultPages={store.resultPages}
         design={store.design}
+        brand={store.brand}
         audiences={store.audiences}
       />
     </PreviewViewportShell>

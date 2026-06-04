@@ -75,6 +75,7 @@ export default function DesignEditor() {
             scoringRules={store.scoringRules}
             resultPages={store.resultPages}
             design={store.design}
+            brand={store.brand}
             selectableMode
             selectedElementId={selectedElementId}
             onSelectElement={handleSelectElement}

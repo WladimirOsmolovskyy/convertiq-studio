@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
-import { defaultDesign } from '@/lib/types';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { defaultDesign, type BrandPalette } from '@/lib/types';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -131,6 +132,19 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
     ? { ...defaultDesign, ...designRes.data.config }
     : defaultDesign;
 
+  // Brand palette is project-level. Anonymous visitors can't read `projects`
+  // through RLS, so resolve it with the service-role admin client.
+  let brand: BrandPalette = {};
+  if (questionnaire.project_id) {
+    const admin = createAdminClient();
+    const { data: project } = await admin
+      .from('projects')
+      .select('brand')
+      .eq('id', questionnaire.project_id)
+      .maybeSingle();
+    brand = (project?.brand ?? {}) as BrandPalette;
+  }
+
   return (
     <QuestionnaireRenderer
       questionnaire={questionnaire}
@@ -139,6 +153,7 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
       scoringRules={scoringRes.data || []}
       resultPages={resultsRes.data || []}
       design={design}
+      brand={brand}
       audiences={audiences}
       templateLeadFields={templateRes.data?.fields ?? []}
     />

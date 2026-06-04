@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, use } from 'react';
 import { usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
-import { defaultDesign } from '@/lib/types';
+import { defaultDesign, type BrandPalette } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import styles from './editor.module.css';
 
@@ -51,6 +51,12 @@ export default function EditorLayout({
           ? await supabase.from('scoring_rules').select('*').in('question_id', questionIds)
           : { data: [] };
 
+        // Project brand palette — the questionnaire's design colors resolve
+        // against it. Owner-readable via RLS.
+        const brandRes = qRes.data.project_id
+          ? await supabase.from('projects').select('brand').eq('id', qRes.data.project_id).maybeSingle()
+          : { data: null };
+
         type AudienceRow = {
           id: string;
           questionnaire_id: string;
@@ -86,6 +92,7 @@ export default function EditorLayout({
             ? { ...defaultDesign, ...designRes.data.config }
             : defaultDesign,
           audiences,
+          brand: (brandRes.data?.brand ?? {}) as BrandPalette,
         });
       }
       setLoaded(true);

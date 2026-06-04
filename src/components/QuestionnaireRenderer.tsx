@@ -29,6 +29,7 @@ import { nanoid } from 'nanoid';
 import type {
   AnswersMap,
   Audience,
+  BrandPalette,
   DesignConfig,
   ElementId,
   LeadField,
@@ -38,6 +39,7 @@ import type {
   ResultPage,
   ScoringRule,
 } from '@/lib/types';
+import { resolveDesign } from '@/lib/designResolve';
 import { isCustomField, resolveLeadFields } from '@/lib/leadFields';
 import { buildLeadPayload } from '@/lib/leadPayload';
 import { assignAudience, countRedFlags } from '@/lib/audiences/assign';
@@ -54,6 +56,10 @@ export interface QuestionnaireRendererProps {
   scoringRules: ScoringRule[];
   resultPages: ResultPage[];
   design: DesignConfig;
+  /** Project brand palette. Design colors resolve against it (element
+   *  override → questionnaire variable → brand token). Optional — when
+   *  absent, design colors fall back to `defaultBrandPalette`. */
+  brand?: BrandPalette;
   /** Audiences (with score ranges) configured on this questionnaire.
    *  Used to assign a bucket to each completed response. */
   audiences?: Audience[];
@@ -99,6 +105,7 @@ export default function QuestionnaireRenderer({
   scoringRules,
   resultPages,
   design,
+  brand,
   audiences,
   styles,
   mode = 'public',
@@ -193,11 +200,16 @@ export default function QuestionnaireRenderer({
   const currentQuestion = questions[currentIndex];
   const progress = questions.length > 0 ? (questionPath.length / questions.length) * 100 : 0;
 
+  // Resolve the stored (possibly sparse) design against the project brand.
+  // Identity for fully-populated configs (existing questionnaires); fills
+  // gaps from brand (new questionnaires). All style reads below use `d`.
+  const d = resolveDesign(design, brand);
+
   const getBackgroundCSS = () => {
-    if (design.background.type === 'gradient') return design.background.value;
-    if (design.background.type === 'image')
-      return `url(${design.background.value}) center/cover no-repeat`;
-    return design.colors.background;
+    if (d.background.type === 'gradient') return d.background.value;
+    if (d.background.type === 'image')
+      return `url(${d.background.value}) center/cover no-repeat`;
+    return d.colors.background;
   };
 
   const getNextQuestionIndex = useCallback(
@@ -467,14 +479,14 @@ export default function QuestionnaireRenderer({
         className={styles.page}
         style={{
           background: getBackgroundCSS(),
-          color: design.colors.text,
-          fontFamily: design.typography.fontFamily,
+          color: d.colors.text,
+          fontFamily: d.typography.fontFamily,
         }}
       >
         <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
           <div style={{ fontSize: '3rem', marginBottom: '1.5rem' }}>📝</div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700 }}>No questions yet</h1>
-          <p style={{ color: design.colors.textMuted }}>
+          <p style={{ color: d.colors.textMuted }}>
             {isPreview ? 'Add questions in the Content tab first.' : 'This questionnaire is empty.'}
           </p>
         </div>
@@ -489,13 +501,13 @@ export default function QuestionnaireRenderer({
       onClick={pageInteract.onClick}
       style={{
         background: getBackgroundCSS(),
-        color: design.typography.body?.color ?? design.colors.text,
-        fontFamily: design.typography.fontFamily,
-        fontSize: `${design.typography.body?.size ?? design.typography.baseFontSize}px`,
-        fontWeight: design.typography.body?.weight ?? 400,
-        lineHeight: design.typography.body?.lineHeight ?? design.typography.lineHeight,
-        letterSpacing: `${design.typography.body?.letterSpacing ?? 0}em`,
-        ...elementOverrideStyle(design, 'page'),
+        color: d.typography.body?.color ?? d.colors.text,
+        fontFamily: d.typography.fontFamily,
+        fontSize: `${d.typography.body?.size ?? d.typography.baseFontSize}px`,
+        fontWeight: d.typography.body?.weight ?? 400,
+        lineHeight: d.typography.body?.lineHeight ?? d.typography.lineHeight,
+        letterSpacing: `${d.typography.body?.letterSpacing ?? 0}em`,
+        ...elementOverrideStyle(d, 'page'),
       }}
     >
       {isPreview && (
@@ -515,8 +527,8 @@ export default function QuestionnaireRenderer({
       <div
         className={styles.container}
         style={{
-          maxWidth: `${design.layout.maxWidth}px`,
-          padding: `0 ${design.layout.padding}rem`,
+          maxWidth: `${d.layout.maxWidth}px`,
+          padding: `0 ${d.layout.padding}rem`,
         }}
       >
         {!completed ? (
@@ -529,26 +541,26 @@ export default function QuestionnaireRenderer({
                   className={`${styles.progressWrap} ${sel.className}`.trim()}
                   onClick={sel.onClick}
                   style={{
-                    marginBottom: `${design.layout.questionSpacing}rem`,
-                    ...elementOverrideStyle(design, 'progress'),
+                    marginBottom: `${d.layout.questionSpacing}rem`,
+                    ...elementOverrideStyle(d, 'progress'),
                   }}
                 >
-                  <div className={styles.progressLabel} style={{ color: design.colors.textMuted }}>
+                  <div className={styles.progressLabel} style={{ color: d.colors.textMuted }}>
                     <span>{questionnaire.title}</span>
                     <span>{showLeadCapture ? 100 : Math.round(progress)}%</span>
                   </div>
                   <div
                     className={styles.progressBar}
                     style={{
-                      background: design.components.progress.background,
-                      height: `${design.components.progress.height}px`,
+                      background: d.components.progress.background,
+                      height: `${d.components.progress.height}px`,
                     }}
                   >
                     <div
                       className={styles.progressFill}
                       style={{
                         width: `${showLeadCapture ? 100 : progress}%`,
-                        background: design.components.progress.fillColor,
+                        background: d.components.progress.fillColor,
                       }}
                     />
                   </div>
@@ -566,25 +578,25 @@ export default function QuestionnaireRenderer({
                 className={`${styles.questionWrap} ${cardSel.className}`.trim()}
                 onClick={cardSel.onClick}
                 style={{
-                  background: design.components.question.background,
-                  border: design.components.question.border,
-                  boxShadow: design.components.question.shadow,
-                  padding: design.components.question.padding,
-                  borderRadius: `${design.layout.borderRadius}px`,
-                  ...elementOverrideStyle(design, 'questionCard'),
+                  background: d.components.question.background,
+                  border: d.components.question.border,
+                  boxShadow: d.components.question.shadow,
+                  padding: d.components.question.padding,
+                  borderRadius: `${d.layout.borderRadius}px`,
+                  ...elementOverrideStyle(d, 'questionCard'),
                 }}
               >
                 <h2
                   className={`${styles.questionTitle} ${titleSel.className}`.trim()}
                   onClick={titleSel.onClick}
                   style={{
-                    fontFamily: design.typography.headingFont,
-                    fontWeight: design.typography.heading?.weight ?? design.typography.headingWeight,
-                    fontSize: `${design.typography.heading?.size ?? Math.round(design.typography.baseFontSize * 1.375)}px`,
-                    lineHeight: design.typography.heading?.lineHeight ?? 1.2,
-                    letterSpacing: `${design.typography.heading?.letterSpacing ?? -0.02}em`,
-                    color: design.typography.heading?.color ?? design.colors.text,
-                    ...elementOverrideStyle(design, 'questionTitle'),
+                    fontFamily: d.typography.headingFont,
+                    fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
+                    fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
+                    lineHeight: d.typography.heading?.lineHeight ?? 1.2,
+                    letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
+                    color: d.typography.heading?.color ?? d.colors.text,
+                    ...elementOverrideStyle(d, 'questionTitle'),
                   }}
                 >
                   Almost done
@@ -593,8 +605,8 @@ export default function QuestionnaireRenderer({
                   className={`${styles.questionDescription} ${descSel.className}`.trim()}
                   onClick={descSel.onClick}
                   style={{
-                    color: design.colors.textMuted,
-                    ...elementOverrideStyle(design, 'questionDescription'),
+                    color: d.colors.textMuted,
+                    ...elementOverrideStyle(d, 'questionDescription'),
                   }}
                 >
                   Tell us a little about yourself to see your result.
@@ -617,7 +629,7 @@ export default function QuestionnaireRenderer({
                         style={{
                           fontSize: '0.875rem',
                           fontWeight: 500,
-                          color: design.colors.text,
+                          color: d.colors.text,
                         }}
                       >
                         {f.label}
@@ -643,10 +655,10 @@ export default function QuestionnaireRenderer({
                               : undefined
                         }
                         style={{
-                          background: design.components.input.background,
-                          border: design.components.input.border,
-                          borderRadius: `${design.components.input.borderRadius}px`,
-                          color: design.colors.text,
+                          background: d.components.input.background,
+                          border: d.components.input.border,
+                          borderRadius: `${d.components.input.borderRadius}px`,
+                          color: d.colors.text,
                         }}
                       />
                     </label>
@@ -673,25 +685,25 @@ export default function QuestionnaireRenderer({
                 onClick={cardSel.onClick}
                 key={currentQuestion.id}
                 style={{
-                  background: design.components.question.background,
-                  border: design.components.question.border,
-                  boxShadow: design.components.question.shadow,
-                  padding: design.components.question.padding,
-                  borderRadius: `${design.layout.borderRadius}px`,
-                  ...elementOverrideStyle(design, 'questionCard'),
+                  background: d.components.question.background,
+                  border: d.components.question.border,
+                  boxShadow: d.components.question.shadow,
+                  padding: d.components.question.padding,
+                  borderRadius: `${d.layout.borderRadius}px`,
+                  ...elementOverrideStyle(d, 'questionCard'),
                 }}
               >
                 <h2
                   className={`${styles.questionTitle} ${titleSel.className}`.trim()}
                   onClick={titleSel.onClick}
                   style={{
-                    fontFamily: design.typography.headingFont,
-                    fontWeight: design.typography.heading?.weight ?? design.typography.headingWeight,
-                    fontSize: `${design.typography.heading?.size ?? Math.round(design.typography.baseFontSize * 1.375)}px`,
-                    lineHeight: design.typography.heading?.lineHeight ?? 1.2,
-                    letterSpacing: `${design.typography.heading?.letterSpacing ?? -0.02}em`,
-                    color: design.typography.heading?.color ?? design.colors.text,
-                    ...elementOverrideStyle(design, 'questionTitle'),
+                    fontFamily: d.typography.headingFont,
+                    fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
+                    fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
+                    lineHeight: d.typography.heading?.lineHeight ?? 1.2,
+                    letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
+                    color: d.typography.heading?.color ?? d.colors.text,
+                    ...elementOverrideStyle(d, 'questionTitle'),
                   }}
                 >
                   {currentQuestion.title}
@@ -703,8 +715,8 @@ export default function QuestionnaireRenderer({
                     className={`${styles.questionDescription} ${descSel.className}`.trim()}
                     onClick={descSel.onClick}
                     style={{
-                      color: design.colors.textMuted,
-                      ...elementOverrideStyle(design, 'questionDescription'),
+                      color: d.colors.textMuted,
+                      ...elementOverrideStyle(d, 'questionDescription'),
                     }}
                   >
                     {currentQuestion.description}
@@ -736,20 +748,20 @@ export default function QuestionnaireRenderer({
                           disabled={isRadio && submitting}
                           style={{
                             background: isSelected
-                              ? design.components.option.selectedBackground
-                              : design.components.option.background,
+                              ? d.components.option.selectedBackground
+                              : d.components.option.background,
                             border: isSelected
-                              ? design.components.option.selectedBorder
-                              : design.components.option.border,
-                            borderRadius: `${design.layout.borderRadius * 0.6}px`,
-                            color: design.colors.text,
-                            ...elementOverrideStyle(design, optElementId),
+                              ? d.components.option.selectedBorder
+                              : d.components.option.border,
+                            borderRadius: `${d.layout.borderRadius * 0.6}px`,
+                            color: d.colors.text,
+                            ...elementOverrideStyle(d, optElementId),
                           }}
                         >
                           {!isRadio && (
                             <div
                               className={`${styles.optionIndicator} ${currentQuestion.type === 'checkbox' ? styles.checkbox : ''}`}
-                              style={{ color: design.colors.accent }}
+                              style={{ color: d.colors.accent }}
                             />
                           )}
                           {opt.label}
@@ -769,11 +781,11 @@ export default function QuestionnaireRenderer({
                       onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
                       placeholder="Type your answer..."
                       style={{
-                        background: design.components.input.background,
-                        border: design.components.input.border,
-                        borderRadius: `${design.components.input.borderRadius}px`,
-                        color: design.colors.text,
-                        ...elementOverrideStyle(design, 'text.input'),
+                        background: d.components.input.background,
+                        border: d.components.input.border,
+                        borderRadius: `${d.components.input.borderRadius}px`,
+                        color: d.colors.text,
+                        ...elementOverrideStyle(d, 'text.input'),
                       }}
                     />
                   );
@@ -789,11 +801,11 @@ export default function QuestionnaireRenderer({
                       onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
                       placeholder="Type your answer..."
                       style={{
-                        background: design.components.input.background,
-                        border: design.components.input.border,
-                        borderRadius: `${design.components.input.borderRadius}px`,
-                        color: design.colors.text,
-                        ...elementOverrideStyle(design, 'textarea.input'),
+                        background: d.components.input.background,
+                        border: d.components.input.border,
+                        borderRadius: `${d.components.input.borderRadius}px`,
+                        color: d.colors.text,
+                        ...elementOverrideStyle(d, 'textarea.input'),
                       }}
                     />
                   );
@@ -810,12 +822,12 @@ export default function QuestionnaireRenderer({
                       onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
                       placeholder="0"
                       style={{
-                        background: design.components.input.background,
-                        border: design.components.input.border,
-                        borderRadius: `${design.components.input.borderRadius}px`,
-                        color: design.colors.text,
+                        background: d.components.input.background,
+                        border: d.components.input.border,
+                        borderRadius: `${d.components.input.borderRadius}px`,
+                        color: d.colors.text,
                         maxWidth: '200px',
-                        ...elementOverrideStyle(design, 'text.input'),
+                        ...elementOverrideStyle(d, 'text.input'),
                       }}
                     />
                   );
@@ -832,11 +844,11 @@ export default function QuestionnaireRenderer({
                       onChange={(e) => handleAnswer(currentQuestion.id, { value: e.target.value })}
                       placeholder="email@example.com"
                       style={{
-                        background: design.components.input.background,
-                        border: design.components.input.border,
-                        borderRadius: `${design.components.input.borderRadius}px`,
-                        color: design.colors.text,
-                        ...elementOverrideStyle(design, 'text.input'),
+                        background: d.components.input.background,
+                        border: d.components.input.border,
+                        borderRadius: `${d.components.input.borderRadius}px`,
+                        color: d.colors.text,
+                        ...elementOverrideStyle(d, 'text.input'),
                       }}
                     />
                   );
@@ -848,7 +860,7 @@ export default function QuestionnaireRenderer({
                     <div
                       className={`${styles.ratingStars} ${sel.className}`.trim()}
                       onClick={sel.onClick}
-                      style={elementOverrideStyle(design, 'rating.starsContainer')}
+                      style={elementOverrideStyle(d, 'rating.starsContainer')}
                     >
                       {[1, 2, 3, 4, 5].map((star) => (
                         <button
@@ -861,8 +873,8 @@ export default function QuestionnaireRenderer({
                           style={{
                             color:
                               star <= (Number(answers[currentQuestion.id]?.value) || 0)
-                                ? design.colors.accent
-                                : design.colors.textMuted,
+                                ? d.colors.accent
+                                : d.colors.textMuted,
                           }}
                         >
                           {star <= (Number(answers[currentQuestion.id]?.value) || 0) ? '★' : '☆'}
@@ -876,7 +888,7 @@ export default function QuestionnaireRenderer({
             })()}
 
             {/* Navigation */}
-            <div className={styles.navButtons} style={{ marginTop: `${design.layout.questionSpacing}rem` }}>
+            <div className={styles.navButtons} style={{ marginTop: `${d.layout.questionSpacing}rem` }}>
               <button
                 className={styles.backBtn}
                 onClick={() => {
@@ -888,7 +900,7 @@ export default function QuestionnaireRenderer({
                   }
                 }}
                 disabled={!showLeadCapture && questionPath.length <= 1}
-                style={{ color: design.colors.textMuted }}
+                style={{ color: d.colors.textMuted }}
               >
                 ← Back
               </button>
@@ -902,13 +914,13 @@ export default function QuestionnaireRenderer({
                     onClick={sel.onClick}
                     disabled={(!showLeadCapture && !canProceed) || submitting}
                     style={{
-                      background: design.components.button.background,
-                      color: design.components.button.color,
-                      borderRadius: `${design.components.button.borderRadius}px`,
-                      padding: design.components.button.padding,
-                      fontSize: `${design.components.button.fontSize}px`,
+                      background: d.components.button.background,
+                      color: d.components.button.color,
+                      borderRadius: `${d.components.button.borderRadius}px`,
+                      padding: d.components.button.padding,
+                      fontSize: `${d.components.button.fontSize}px`,
                       opacity: !showLeadCapture && !canProceed ? 0.5 : 1,
-                      ...elementOverrideStyle(design, 'button'),
+                      ...elementOverrideStyle(d, 'button'),
                     }}
                   >
                     {submitting
@@ -939,24 +951,24 @@ export default function QuestionnaireRenderer({
             return (
               <div className={styles.resultsPage}>
                 {matchedPage ? (
-                  <ResultPageRenderer page={matchedPage} ctx={resultCtx} design={design} />
+                  <ResultPageRenderer page={matchedPage} ctx={resultCtx} design={d} />
                 ) : (
                   /* No score range matched — minimal fallback. */
                   <>
                     <h1
                       className={styles.resultsTitle}
                       style={{
-                        fontFamily: design.typography.headingFont,
-                        fontWeight: design.typography.heading?.weight ?? design.typography.headingWeight,
-                        letterSpacing: `${design.typography.heading?.letterSpacing ?? -0.02}em`,
-                        color: design.typography.heading?.color ?? design.colors.text,
+                        fontFamily: d.typography.headingFont,
+                        fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
+                        letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
+                        color: d.typography.heading?.color ?? d.colors.text,
                       }}
                     >
                       Thank you!
                     </h1>
                     <p
                       className={styles.resultsDescription}
-                      style={{ color: design.colors.textMuted }}
+                      style={{ color: d.colors.textMuted }}
                     >
                       Your responses have been recorded.
                     </p>

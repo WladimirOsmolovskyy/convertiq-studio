@@ -8,6 +8,7 @@ import type {
   DesignConfig,
   ElementId,
   ElementStyles,
+  BrandPalette,
   Questionnaire,
   LeadField,
   Audience,
@@ -44,6 +45,9 @@ interface QuestionnaireState {
   scoringRules: ScoringRule[];
   resultPages: ResultPage[];
   design: DesignConfig;
+  /** Project-level brand palette. Read-only here — design colors resolve
+   *  against it. Empty until hydrated. */
+  brand: BrandPalette;
   audiences: Audience[];
   isDirty: boolean;
   isSaving: boolean;
@@ -122,6 +126,7 @@ interface QuestionnaireState {
     resultPages: ResultPage[];
     design: DesignConfig;
     audiences: Audience[];
+    brand?: BrandPalette;
   }) => void;
   reset: () => void;
   saveAll: () => Promise<void>;
@@ -134,6 +139,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
   scoringRules: [],
   resultPages: [],
   design: defaultDesign,
+  brand: {},
   audiences: [],
   isDirty: false,
   isSaving: false,
@@ -556,10 +562,10 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
     });
   },
 
-  hydrate: (data) => set({ ...data, isDirty: false, isSaving: false, saveStatus: 'idle' }),
+  hydrate: (data) => set({ ...data, brand: data.brand ?? {}, isDirty: false, isSaving: false, saveStatus: 'idle' }),
 
   reset: () =>
-    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], resultPages: [], design: defaultDesign, audiences: [], isDirty: false, isSaving: false, saveStatus: 'idle' }),
+    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], resultPages: [], design: defaultDesign, brand: {}, audiences: [], isDirty: false, isSaving: false, saveStatus: 'idle' }),
 
   saveAll: async () => {
     // Read fresh state on each call so we always persist the latest store.
