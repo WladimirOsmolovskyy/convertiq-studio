@@ -504,6 +504,117 @@ export interface Project {
   name: string;
   created_at: string;
   updated_at: string;
+  /** Project-level shared color palette. Sparse — missing tokens fall
+   *  back to `defaultBrandPalette`. The most-global color layer:
+   *  questionnaire color variables default from here. */
+  brand?: BrandPalette;
+}
+
+/* ─── Brand palette (project-level design tokens) ───────────────── */
+
+/**
+ * The fixed set of brand color tokens, grouped semantically. Token ids
+ * are stable strings (dotted namespace) used as keys in `BrandPalette`
+ * and as the inheritance source for questionnaire color variables.
+ */
+export type BrandTokenId =
+  // 01 Background
+  | 'background.primary'
+  | 'background.secondary'
+  // 02 UI
+  | 'surface'
+  | 'surface.highlight'
+  | 'surface.secondary'
+  | 'line'
+  | 'line.highlight'
+  | 'line.secondary'
+  // 03 Texts
+  | 'heading'
+  | 'body'
+  | 'heading.secondary'
+  | 'body.secondary'
+  // 04 Brand
+  | 'brand.core'
+  | 'brand.accent'
+  | 'brand.highlight';
+
+/** token id → CSS color (hex). Stored sparse; merge over defaults to read. */
+export type BrandPalette = Partial<Record<BrandTokenId, string>>;
+
+/** UI grouping + labels for the brand editor. Order is presentation order. */
+export const BRAND_GROUPS: {
+  id: string;
+  label: string;
+  tokens: { id: BrandTokenId; label: string }[];
+}[] = [
+  {
+    id: 'background',
+    label: 'Background',
+    tokens: [
+      { id: 'background.primary', label: 'Background: Primary' },
+      { id: 'background.secondary', label: 'Background: Secondary' },
+    ],
+  },
+  {
+    id: 'ui',
+    label: 'UI',
+    tokens: [
+      { id: 'surface', label: 'Surface' },
+      { id: 'surface.highlight', label: 'Surface: Highlight' },
+      { id: 'surface.secondary', label: 'Surface: Secondary' },
+      { id: 'line', label: 'Line' },
+      { id: 'line.highlight', label: 'Line: Highlight' },
+      { id: 'line.secondary', label: 'Line: Secondary' },
+    ],
+  },
+  {
+    id: 'texts',
+    label: 'Texts',
+    tokens: [
+      { id: 'heading', label: 'Heading' },
+      { id: 'body', label: 'Body' },
+      { id: 'heading.secondary', label: 'Heading: Secondary' },
+      { id: 'body.secondary', label: 'Body: Secondary' },
+    ],
+  },
+  {
+    id: 'brand',
+    label: 'Brand',
+    tokens: [
+      { id: 'brand.core', label: 'Core' },
+      { id: 'brand.accent', label: 'Accent' },
+      { id: 'brand.highlight', label: 'Highlight' },
+    ],
+  },
+];
+
+/**
+ * Default brand palette. A clean light theme aligned with the existing
+ * questionnaire defaults (white surfaces, near-black text, Apple blue
+ * core) so questionnaires that inherit it look right out of the box.
+ * Users recolor freely in the Brand editor.
+ */
+export const defaultBrandPalette: Record<BrandTokenId, string> = {
+  'background.primary': '#ffffff',
+  'background.secondary': '#f5f5f7',
+  'surface': '#ffffff',
+  'surface.highlight': '#f5f5f7',
+  'surface.secondary': '#fafafa',
+  'line': '#e5e5e7',
+  'line.highlight': '#d1d1d6',
+  'line.secondary': '#f0f0f2',
+  'heading': '#1d1d1f',
+  'body': '#2c2c2e',
+  'heading.secondary': '#6e6e73',
+  'body.secondary': '#8e8e93',
+  'brand.core': '#007aff',
+  'brand.accent': '#5856d6',
+  'brand.highlight': '#ff9500',
+};
+
+/** Read a token's effective color: stored value, else default. */
+export function resolveBrandToken(palette: BrandPalette | undefined, id: BrandTokenId): string {
+  return palette?.[id] ?? defaultBrandPalette[id];
 }
 
 /* ─── Project Domain ───────────────────────────────────────────── */
