@@ -1,7 +1,7 @@
 /**
  * Design resolution — the single place where a stored (possibly sparse)
  * DesignConfig is resolved against the project's Brand palette into a
- * fully-populated config the renderer can consume.
+ * fully-populated design the renderer can consume.
  *
  * Three-tier color model:
  *   element override  →  questionnaire variable (design.colors)  →  Brand token
@@ -11,12 +11,12 @@
  * way the editor used to (the logic moved here from
  * `syncColorsToComponents`). Values that ARE present win — so existing
  * questionnaires, whose configs are fully populated, resolve to exactly
- * their stored values (identity). Only sparse configs (new questionnaires)
- * fall through to Brand.
+ * their stored values (identity). Sparse configs (new questionnaires,
+ * whose `colors`/`components` are empty) fall through to Brand.
  *
  * Because `defaultBrandPalette` equals the historical default questionnaire
- * colors, a brand-new (empty) design resolved against the default brand
- * reproduces the previous default look pixel-for-pixel.
+ * colors, an empty design resolved against the default brand reproduces the
+ * previous default look pixel-for-pixel.
  */
 
 import {
@@ -26,11 +26,22 @@ import {
   resolveBrandToken,
 } from './types';
 
-type Colors = DesignConfig['colors'];
-type Components = DesignConfig['components'];
+/** Stored (sparse) shapes. */
+type Colors = NonNullable<DesignConfig['colors']>;
+type StoredComponents = DesignConfig['components'];
+
+/** Fully-resolved shapes (every field present). */
+export type ResolvedColors = Required<Colors>;
+export type ResolvedComponents = {
+  [K in keyof StoredComponents]-?: Required<NonNullable<StoredComponents[K]>>;
+};
+export type ResolvedDesign = Omit<DesignConfig, 'colors' | 'components'> & {
+  colors: ResolvedColors;
+  components: ResolvedComponents;
+};
 
 /** Which Brand token each questionnaire color variable inherits by default. */
-const COLOR_TO_BRAND: Record<keyof Colors, BrandTokenId> = {
+const COLOR_TO_BRAND: Record<keyof ResolvedColors, BrandTokenId> = {
   primary: 'brand.core',
   secondary: 'brand.accent',
   background: 'background.primary',
@@ -38,13 +49,12 @@ const COLOR_TO_BRAND: Record<keyof Colors, BrandTokenId> = {
   text: 'body',
   textMuted: 'body.secondary',
   accent: 'brand.core',
-  // No brand token for status colors — fall back to literals below.
   error: 'brand.highlight',
   success: 'brand.accent',
 };
 
 /** Literal fallbacks for color variables that don't map cleanly to brand. */
-const COLOR_LITERAL_FALLBACK: Partial<Record<keyof Colors, string>> = {
+const COLOR_LITERAL_FALLBACK: Partial<Record<keyof ResolvedColors, string>> = {
   error: '#ff3b30',
   success: '#34c759',
 };
@@ -75,11 +85,11 @@ function isLight(hex: string): boolean {
 
 /** Resolve the questionnaire color variables: literal ?? brand ?? fallback. */
 export function resolveColors(
-  stored: Partial<Colors> | undefined,
+  stored: Colors | undefined,
   brand: BrandPalette | undefined,
-): Colors {
-  const c = stored ?? {};
-  const pick = (key: keyof Colors): string =>
+): ResolvedColors {
+  const c: Colors = stored ?? {};
+  const fromBrand = (key: keyof ResolvedColors) =>
     c[key] ?? COLOR_LITERAL_FALLBACK[key] ?? resolveBrandToken(brand, COLOR_TO_BRAND[key]);
   return {
     primary: c.primary ?? resolveBrandToken(brand, COLOR_TO_BRAND.primary),
@@ -89,18 +99,21 @@ export function resolveColors(
     text: c.text ?? resolveBrandToken(brand, COLOR_TO_BRAND.text),
     textMuted: c.textMuted ?? resolveBrandToken(brand, COLOR_TO_BRAND.textMuted),
     accent: c.accent ?? c.primary ?? resolveBrandToken(brand, COLOR_TO_BRAND.accent),
-    error: pick('error'),
-    success: pick('success'),
+    error: fromBrand('error'),
+    success: fromBrand('success'),
   };
 }
 
 /** Derive component styling from resolved colors (the old syncColorsToComponents). */
-function deriveComponents(colors: Colors, stored: Partial<Components> | undefined): Components {
+function deriveComponents(
+  colors: ResolvedColors,
+  stored: StoredComponents | undefined,
+): ResolvedComponents {
   const bg = colors.background;
   const primary = colors.primary;
   const surface = colors.surface;
   const light = isLight(isValidHex(bg) ? bg : '#ffffff');
-  const s = stored ?? {};
+  const s: Partial<StoredComponents> = stored ?? {};
 
   return {
     question: {
@@ -139,9 +152,9 @@ function deriveComponents(colors: Colors, stored: Partial<Components> | undefine
 
 /**
  * Resolve a stored design against the project brand into a fully-populated
- * DesignConfig. Identity for fully-populated inputs; fills gaps from brand.
+ * design. Identity for fully-populated inputs; fills gaps from brand.
  */
-export function resolveDesign(design: DesignConfig, brand?: BrandPalette): DesignConfig {
+export function resolveDesign(design: DesignConfig, brand?: BrandPalette): ResolvedDesign {
   const colors = resolveColors(design.colors, brand);
   const components = deriveComponents(colors, design.components);
   return { ...design, colors, components };

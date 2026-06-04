@@ -10,7 +10,9 @@
  * No behavior changes in this extraction — same controls, same handlers.
  */
 
+import { RotateCcw, Link2 } from 'lucide-react';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
+import { resolveDesign } from '@/lib/designResolve';
 import editorStyles from '../editor.module.css';
 import designStyles from './design.module.css';
 
@@ -52,17 +54,6 @@ function hexToRgb(hex: string): [number, number, number] | null {
   return [parseInt(m[0], 16), parseInt(m[1], 16), parseInt(m[2], 16)];
 }
 function isValidHex(c: string) { return /^#[0-9a-fA-F]{6}$/.test(c); }
-function rgba(hex: string, alpha: number) {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return `rgba(0,0,0,${alpha})`;
-  return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`;
-}
-function adjustBrightness(hex: string, amount: number): string {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return hex;
-  const clamp = (v: number) => Math.min(255, Math.max(0, v));
-  return `#${[clamp(rgb[0] + amount), clamp(rgb[1] + amount), clamp(rgb[2] + amount)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
-}
 function isLight(hex: string): boolean {
   const rgb = hexToRgb(hex);
   if (!rgb) return true;
@@ -90,19 +81,53 @@ function getHeading(design: any) {
 }
 
 /* ── Sub-components ────────────────────────────────────────────── */
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function ColorField({
+  label, value, onChange, overridden, onRestore, inheritLabel = 'Brand',
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  /** Whether this color is locally overridden (vs inheriting). */
+  overridden?: boolean;
+  /** Clear the local override → inherit. When omitted, no state UI shows. */
+  onRestore?: () => void;
+  /** What this field inherits from when not overridden (chip label). */
+  inheritLabel?: string;
+}) {
   const displayColor = isValidHex(value) ? value : '#000000';
   return (
     <div className={editorStyles.colorField}>
       <div className={editorStyles.colorSwatch} style={{ backgroundColor: displayColor }}>
         <input type="color" value={displayColor} onChange={(e) => onChange(e.target.value)} />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.0625rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.0625rem', minWidth: 0 }}>
         <span className={editorStyles.colorLabel}>{label}</span>
         <span style={{ fontSize: '0.5625rem', color: 'var(--text-muted)', fontFamily: "'SF Mono', monospace" }}>
           {value.substring(0, 20)}
         </span>
       </div>
+      {onRestore && (
+        <span className={designStyles.colorFieldState}>
+          {overridden ? (
+            <>
+              <span className={designStyles.overrideDot} title="Overridden" />
+              <button
+                type="button"
+                className={designStyles.restoreBtn}
+                onClick={onRestore}
+                title={`Restore to ${inheritLabel}`}
+                aria-label={`Restore ${label} to ${inheritLabel}`}
+              >
+                <RotateCcw size={12} strokeWidth={2} />
+              </button>
+            </>
+          ) : (
+            <span className={designStyles.inheritChip} title={`Inheriting from ${inheritLabel}`}>
+              <Link2 size={11} strokeWidth={2} />
+            </span>
+          )}
+        </span>
+      )}
     </div>
   );
 }
@@ -236,62 +261,33 @@ function FontPanel({
 
 /* ── Main Component ────────────────────────────────────────────── */
 export default function VariablesPanel() {
-  const { design, updateDesign } = useQuestionnaireStore();
+  const { design, brand, updateDesign } = useQuestionnaireStore();
+  // Resolved view for DISPLAY — fields the questionnaire doesn't override
+  // show their inherited Brand value. Writes still set sparse overrides.
+  const r = resolveDesign(design, brand);
 
   const body = getBody(design);
   const heading = getHeading(design);
 
-  const syncColorsToComponents = (colors: typeof design.colors) => {
-    const bg = colors.background;
-    const primary = colors.primary;
-    const surface = colors.surface;
-    const light = isLight(isValidHex(bg) ? bg : '#ffffff');
-
-    updateDesign({
-      colors,
-      components: {
-        question: {
-          background: surface,
-          border: `1px solid ${light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
-          shadow: light ? '0 2px 8px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' : '0 4px 24px rgba(0,0,0,0.3)',
-          padding: '2rem',
-        },
-        option: {
-          background: light ? adjustBrightness(isValidHex(bg) ? bg : '#ffffff', -8) : 'rgba(255,255,255,0.04)',
-          hoverBackground: light ? adjustBrightness(isValidHex(bg) ? bg : '#ffffff', -16) : 'rgba(255,255,255,0.08)',
-          selectedBackground: rgba(isValidHex(primary) ? primary : '#007aff', 0.08),
-          border: `1px solid ${light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`,
-          selectedBorder: `1px solid ${rgba(isValidHex(primary) ? primary : '#007aff', 0.4)}`,
-        },
-        button: {
-          ...design.components.button,
-          background: primary,
-          color: isLight(isValidHex(primary) ? primary : '#007aff') ? '#000000' : '#ffffff',
-        },
-        progress: {
-          background: light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
-          fillColor: primary,
-          height: design.components.progress.height,
-        },
-        input: {
-          background: surface,
-          border: `1px solid ${light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`,
-          focusBorder: `1px solid ${primary}`,
-          borderRadius: design.components.input.borderRadius,
-        },
-      },
-      background: {
-        type: design.background.type,
-        value: design.background.type === 'solid' ? bg : design.background.value,
-      },
-    });
-  };
-
+  // Editing a color variable overrides it at the questionnaire level. The
+  // other colors keep inheriting Brand, and component colors re-derive from
+  // the resolved palette at render time (no more eager syncing).
   const handleColorChange = (key: keyof typeof design.colors, value: string) => {
-    const newColors = { ...design.colors, [key]: value };
-    if (key === 'primary') newColors.accent = value;
-    syncColorsToComponents(newColors);
+    const next = { ...design.colors, [key]: value };
+    if (key === 'primary') next.accent = value;
+    updateDesign({ colors: next });
   };
+
+  // Restore = clear the local override (set undefined) → the value inherits
+  // its Brand token / derived default again at render time.
+  const restoreColorVar = (key: keyof typeof design.colors) =>
+    updateDesign({
+      colors: { ...design.colors, [key]: undefined, ...(key === 'primary' ? { accent: undefined } : {}) },
+    });
+  const restoreButtonField = (field: keyof typeof design.components.button) =>
+    updateDesign({ components: { ...design.components, button: { ...design.components.button, [field]: undefined } } });
+  const restoreProgressField = (field: keyof typeof design.components.progress) =>
+    updateDesign({ components: { ...design.components, progress: { ...design.components.progress, [field]: undefined } } });
 
   const updateBody = (updates: Partial<typeof body>) => {
     const merged = { ...body, ...updates };
@@ -322,10 +318,14 @@ export default function VariablesPanel() {
       <div className={editorStyles.designSection}>
         <SectionTitle>Colors</SectionTitle>
         <div className={editorStyles.colorGrid}>
-          <ColorField label="Primary" value={design.colors.primary} onChange={(v) => handleColorChange('primary', v)} />
-          <ColorField label="Secondary" value={design.colors.secondary} onChange={(v) => handleColorChange('secondary', v)} />
-          <ColorField label="Background" value={design.colors.background} onChange={(v) => handleColorChange('background', v)} />
-          <ColorField label="Surface" value={design.colors.surface} onChange={(v) => handleColorChange('surface', v)} />
+          <ColorField label="Primary" value={r.colors.primary} overridden={design.colors.primary !== undefined}
+            onChange={(v) => handleColorChange('primary', v)} onRestore={() => restoreColorVar('primary')} />
+          <ColorField label="Secondary" value={r.colors.secondary} overridden={design.colors.secondary !== undefined}
+            onChange={(v) => handleColorChange('secondary', v)} onRestore={() => restoreColorVar('secondary')} />
+          <ColorField label="Background" value={r.colors.background} overridden={design.colors.background !== undefined}
+            onChange={(v) => handleColorChange('background', v)} onRestore={() => restoreColorVar('background')} />
+          <ColorField label="Surface" value={r.colors.surface} overridden={design.colors.surface !== undefined}
+            onChange={(v) => handleColorChange('surface', v)} onRestore={() => restoreColorVar('surface')} />
         </div>
       </div>
 
@@ -388,10 +388,10 @@ export default function VariablesPanel() {
                 background: {
                   type: t,
                   value: t === 'gradient'
-                    ? `linear-gradient(135deg, ${design.colors.background}, ${design.colors.primary})`
+                    ? `linear-gradient(135deg, ${r.colors.background}, ${r.colors.primary})`
                     : t === 'image'
                       ? (design.background.type === 'image' ? design.background.value : '')
-                      : design.colors.background,
+                      : r.colors.background,
                 },
               })}
             >
@@ -452,14 +452,18 @@ export default function VariablesPanel() {
       <div className={editorStyles.designSection}>
         <SectionTitle>Button</SectionTitle>
         <div className={editorStyles.colorGrid} style={{ marginBottom: '0.625rem' }}>
-          <ColorField label="Background" value={design.components.button.background}
-            onChange={(v) => updateDesign({ components: { ...design.components, button: { ...design.components.button, background: v, color: isLight(isValidHex(v) ? v : '#007aff') ? '#000000' : '#ffffff' } } })} />
-          <ColorField label="Text" value={design.components.button.color}
-            onChange={(v) => updateDesign({ components: { ...design.components, button: { ...design.components.button, color: v } } })} />
+          <ColorField label="Background" value={r.components.button.background} inheritLabel="Primary"
+            overridden={design.components.button.background !== undefined}
+            onChange={(v) => updateDesign({ components: { ...design.components, button: { ...design.components.button, background: v, color: isLight(isValidHex(v) ? v : '#007aff') ? '#000000' : '#ffffff' } } })}
+            onRestore={() => restoreButtonField('background')} />
+          <ColorField label="Text" value={r.components.button.color} inheritLabel="Auto"
+            overridden={design.components.button.color !== undefined}
+            onChange={(v) => updateDesign({ components: { ...design.components, button: { ...design.components.button, color: v } } })}
+            onRestore={() => restoreButtonField('color')} />
         </div>
-        <SliderField label="Radius" value={design.components.button.borderRadius}
+        <SliderField label="Radius" value={r.components.button.borderRadius}
           onChange={(v) => updateDesign({ components: { ...design.components, button: { ...design.components.button, borderRadius: v } } })} min={0} max={980} unit="px" />
-        <SliderField label="Font Size" value={design.components.button.fontSize}
+        <SliderField label="Font Size" value={r.components.button.fontSize}
           onChange={(v) => updateDesign({ components: { ...design.components, button: { ...design.components.button, fontSize: v } } })} min={12} max={22} unit="px" />
       </div>
 
@@ -467,12 +471,16 @@ export default function VariablesPanel() {
       <div className={editorStyles.designSection}>
         <SectionTitle>Progress Bar</SectionTitle>
         <div className={editorStyles.colorGrid} style={{ marginBottom: '0.625rem' }}>
-          <ColorField label="Track" value={design.components.progress.background}
-            onChange={(v) => updateDesign({ components: { ...design.components, progress: { ...design.components.progress, background: v } } })} />
-          <ColorField label="Fill" value={design.components.progress.fillColor}
-            onChange={(v) => updateDesign({ components: { ...design.components, progress: { ...design.components.progress, fillColor: v } } })} />
+          <ColorField label="Track" value={r.components.progress.background} inheritLabel="Auto"
+            overridden={design.components.progress.background !== undefined}
+            onChange={(v) => updateDesign({ components: { ...design.components, progress: { ...design.components.progress, background: v } } })}
+            onRestore={() => restoreProgressField('background')} />
+          <ColorField label="Fill" value={r.components.progress.fillColor} inheritLabel="Primary"
+            overridden={design.components.progress.fillColor !== undefined}
+            onChange={(v) => updateDesign({ components: { ...design.components, progress: { ...design.components.progress, fillColor: v } } })}
+            onRestore={() => restoreProgressField('fillColor')} />
         </div>
-        <SliderField label="Height" value={design.components.progress.height}
+        <SliderField label="Height" value={r.components.progress.height}
           onChange={(v) => updateDesign({ components: { ...design.components, progress: { ...design.components.progress, height: v } } })} min={2} max={12} unit="px" />
       </div>
 
@@ -488,7 +496,7 @@ export default function VariablesPanel() {
           ].map(({ name, dot, border, colors }) => (
             <button key={name} className="btn btn-ghost btn-sm" style={{ border: '1px solid var(--border)' }}
               onClick={() => {
-                syncColorsToComponents({ ...design.colors, ...colors });
+                updateDesign({ colors: { ...design.colors, ...colors } });
                 updateBody({ color: colors.text });
                 updateHeading({ color: colors.text });
               }}>

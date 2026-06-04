@@ -263,7 +263,11 @@ export function newNavWithLogoNode(): ResultFrameNode {
 /* ─── Design Config ─────────────────────────────────────────────── */
 
 export interface DesignConfig {
-  colors: {
+  /** Questionnaire color variables. SPARSE — an absent key inherits the
+   *  mapped Brand token at render time (see `designResolve`). Existing
+   *  questionnaires store full objects (= overrides); new ones start empty
+   *  (= inherit brand). */
+  colors: Partial<{
     primary: string;
     secondary: string;
     background: string;
@@ -273,7 +277,7 @@ export interface DesignConfig {
     accent: string;
     error: string;
     success: string;
-  };
+  }>;
   typography: {
     fontFamily: string;
     headingFont: string;
@@ -302,38 +306,41 @@ export interface DesignConfig {
     borderRadius: number; // px
     questionSpacing: number; // rem
   };
+  /** Component styling. Each sub-object is SPARSE — absent fields are
+   *  derived from the resolved colors at render time. The five keys are
+   *  always present (possibly empty) to keep merges simple. */
   components: {
-    question: {
+    question: Partial<{
       background: string;
       border: string;
       shadow: string;
       padding: string;
-    };
-    option: {
+    }>;
+    option: Partial<{
       background: string;
       hoverBackground: string;
       selectedBackground: string;
       border: string;
       selectedBorder: string;
-    };
-    button: {
+    }>;
+    button: Partial<{
       background: string;
       color: string;
       borderRadius: number;
       padding: string;
       fontSize: number;
-    };
-    progress: {
+    }>;
+    progress: Partial<{
       background: string;
       fillColor: string;
       height: number;
-    };
-    input: {
+    }>;
+    input: Partial<{
       background: string;
       border: string;
       focusBorder: string;
       borderRadius: number;
-    };
+    }>;
   };
   background: {
     type: 'solid' | 'gradient' | 'image';
@@ -418,17 +425,10 @@ export interface ElementStyles {
 }
 
 export const defaultDesign: DesignConfig = {
-  colors: {
-    primary: '#007aff',
-    secondary: '#5856d6',
-    background: '#ffffff',
-    surface: '#ffffff',
-    text: '#1d1d1f',
-    textMuted: '#6e6e73',
-    accent: '#007aff',
-    error: '#ff3b30',
-    success: '#34c759',
-  },
+  // Empty → a new questionnaire inherits every color from the project Brand
+  // palette. `defaultBrandPalette` equals the historical defaults above, so
+  // an untouched new questionnaire looks exactly as it always did.
+  colors: {},
   typography: {
     fontFamily: "'Inter', sans-serif",
     headingFont: "'Inter', sans-serif",
@@ -457,38 +457,15 @@ export const defaultDesign: DesignConfig = {
     borderRadius: 14,
     questionSpacing: 1.5,
   },
+  // Empty sub-objects → component colors derive from the resolved (brand)
+  // colors at render time. The five keys stay present so design merges and
+  // the editor's component sections have a stable object to spread.
   components: {
-    question: {
-      background: '#ffffff',
-      border: '1px solid rgba(0,0,0,0.08)',
-      shadow: '0 2px 8px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)',
-      padding: '2rem',
-    },
-    option: {
-      background: '#f5f5f7',
-      hoverBackground: '#ededf0',
-      selectedBackground: 'rgba(0,122,255,0.08)',
-      border: '1px solid rgba(0,0,0,0.06)',
-      selectedBorder: '1px solid rgba(0,122,255,0.4)',
-    },
-    button: {
-      background: '#007aff',
-      color: '#ffffff',
-      borderRadius: 980,
-      padding: '0.875rem 2rem',
-      fontSize: 16,
-    },
-    progress: {
-      background: 'rgba(0,0,0,0.06)',
-      fillColor: '#007aff',
-      height: 4,
-    },
-    input: {
-      background: '#ffffff',
-      border: '1px solid rgba(0,0,0,0.1)',
-      focusBorder: '1px solid #007aff',
-      borderRadius: 10,
-    },
+    question: {},
+    option: {},
+    button: {},
+    progress: {},
+    input: {},
   },
   background: {
     type: 'solid',

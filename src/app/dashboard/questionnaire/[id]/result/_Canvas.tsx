@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import ResultPageRenderer from '@/components/ResultPageRenderer';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
+import { resolveDesign } from '@/lib/designResolve';
 import {
   newFrameNode,
   newImageNode,
@@ -49,8 +50,12 @@ const BLOCK_PRESETS: BlockOption[] = [
 ];
 
 export default function Canvas({ page, selectedNodeId, onSelectNode }: Props) {
-  const { design, questions, addResultPageNode } = useQuestionnaireStore();
+  const { design, brand, questions, addResultPageNode } = useQuestionnaireStore();
   const [showBlockMenu, setShowBlockMenu] = useState(false);
+
+  // Resolve colors against brand so the result-page preview matches the
+  // published render (and tolerates sparse/new-questionnaire designs).
+  const resolvedDesign = resolveDesign(design, brand);
 
   // Editor uses synthetic sample data so authors see real-looking content.
   const sampleCtx: ResultRenderContext = {
@@ -141,7 +146,7 @@ export default function Canvas({ page, selectedNodeId, onSelectNode }: Props) {
         <ResultPageRenderer
           page={page}
           ctx={sampleCtx}
-          design={design}
+          design={resolvedDesign}
           selectedNodeId={selectedNodeId}
           onSelectNode={onSelectNode}
         />
