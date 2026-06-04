@@ -37,6 +37,12 @@ You're working in a feature worktree (e.g. `~/Programming/convertiq-agent-N`). A
 - Don't checkout other branches. Stay on your assigned `agent-N` branch.
 - Don't trigger deploys.
 
+## After a sync
+
+Your worktree may be reset to the latest `staging` between tasks (the orchestrator runs `ciq-s sync`). When that happens, a **`SYNC_NOTES.md`** appears in your worktree root listing the commits + files that just landed.
+
+If `SYNC_NOTES.md` exists: read it first, account for those changes (especially edits to files you're working on), then delete it. Don't commit it — it's gitignored, but delete it so a stale note doesn't linger.
+
 ## Worktree setup (first time only)
 
 If `.env.local` is missing:

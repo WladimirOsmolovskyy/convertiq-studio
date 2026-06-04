@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env*.example
 
+# per-worktree agent catch-up note, written by `ciq-s sync`
+SYNC_NOTES.md
+
 # vercel
 .vercel
 
