@@ -29,6 +29,7 @@ import { nanoid } from 'nanoid';
 import type {
   AnswersMap,
   Audience,
+  BranchCondition,
   BrandPalette,
   DesignConfig,
   ElementId,
@@ -84,6 +85,63 @@ export interface QuestionnaireRendererProps {
 }
 
 const hasOptions = (type: string) => ['radio', 'checkbox', 'dropdown'].includes(type);
+
+/**
+ * Evaluate a single branch condition against a visitor's answer.
+ *
+ * The only place branch conditions are interpreted at runtime — shared by the
+ * public flow and the editor preview. `condition.field` discriminates how
+ * `condition.value` is matched:
+ *   - 'option' → value is an option id, tested against `ans.selected_options`
+ *   - 'value'  → value is a literal, tested against the free-text `ans.value`
+ *
+ * An empty `condition.value` never matches, so an incompletely-authored branch
+ * (e.g. a freshly-added one) is inert rather than silently routing. `greater_than`
+ * / `less_than` are numeric (NaN operands never match) and are meaningless for
+ * option ids, so they return false there.
+ */
+function branchMatches(
+  condition: BranchCondition,
+  ans: { value?: string; selected_options?: string[] } | undefined,
+): boolean {
+  const { field, operator, value } = condition;
+  if (value === '') return false;
+
+  if (field === 'option') {
+    const selected = ans?.selected_options ?? [];
+    switch (operator) {
+      case 'equals':
+      case 'contains':
+        return selected.includes(value);
+      case 'not_equals':
+        return !selected.includes(value);
+      default:
+        return false;
+    }
+  }
+
+  const raw = ans?.value ?? '';
+  switch (operator) {
+    case 'equals':
+      return raw === value;
+    case 'not_equals':
+      return raw !== value;
+    case 'contains':
+      return raw.includes(value);
+    case 'greater_than': {
+      const a = Number(raw);
+      const b = Number(value);
+      return Number.isFinite(a) && Number.isFinite(b) && a > b;
+    }
+    case 'less_than': {
+      const a = Number(raw);
+      const b = Number(value);
+      return Number.isFinite(a) && Number.isFinite(b) && a < b;
+    }
+    default:
+      return false;
+  }
+}
 
 /** Convert sparse `design.elements[id]` overrides into inline CSS. Only the
  *  fields wired in Commit C are emitted (fill, radius, padding); VarRefs are
@@ -215,33 +273,17 @@ export default function QuestionnaireRenderer({
   const getNextQuestionIndex = useCallback(
     (qIndex: number, answer: AnswersMap) => {
       const q = questions[qIndex];
-      const qBranches = branches.filter((b) => b.question_id === q.id);
+      const qBranches = branches
+        .filter((b) => b.question_id === q.id)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
+      const ans = answer[q.id];
       for (const branch of qBranches) {
-        if (branch.is_end) {
-          const ans = answer[q.id];
-          if (branch.condition.operator === 'equals') {
-            if (
-              ans?.selected_options?.includes(branch.condition.value) ||
-              ans?.value === branch.condition.value
-            ) {
-              return -1;
-            }
-          }
-        }
+        if (!branchMatches(branch.condition, ans)) continue;
+        if (branch.is_end) return -1;
         if (branch.target_question_id) {
-          const ans = answer[q.id];
-          let matches = false;
-          if (branch.condition.operator === 'equals') {
-            matches =
-              ans?.selected_options?.includes(branch.condition.value) ||
-              ans?.value === branch.condition.value ||
-              false;
-          }
-          if (matches) {
-            const targetIdx = questions.findIndex((tq) => tq.id === branch.target_question_id);
-            if (targetIdx >= 0) return targetIdx;
-          }
+          const targetIdx = questions.findIndex((tq) => tq.id === branch.target_question_id);
+          if (targetIdx >= 0) return targetIdx;
         }
       }
       return qIndex + 1 < questions.length ? qIndex + 1 : -1;

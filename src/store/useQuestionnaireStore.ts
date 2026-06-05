@@ -74,6 +74,7 @@ interface QuestionnaireState {
   addBranch: (questionId: string) => void;
   updateBranch: (id: string, updates: Partial<QuestionBranch>) => void;
   removeBranch: (id: string) => void;
+  reorderBranches: (questionId: string, fromIndex: number, toIndex: number) => void;
   updateScoringRule: (questionId: string, updates: Partial<ScoringRule>) => void;
   addResultPage: () => void;
   updateResultPage: (id: string, updates: Partial<ResultPage>) => void;
@@ -283,17 +284,35 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
       isDirty: true,
     }),
 
-  addBranch: (qId) =>
+  addBranch: (qId) => {
+    const q = get().questions.find((x) => x.id === qId);
+    const field: 'option' | 'value' =
+      q && (q.type === 'radio' || q.type === 'checkbox' || q.type === 'dropdown') ? 'option' : 'value';
+    const sortOrder = get().branches.filter((b) => b.question_id === qId).length;
     set({
-      branches: [...get().branches, { id: crypto.randomUUID(), question_id: qId, condition: { field: '', operator: 'equals', value: '' }, target_question_id: null, is_end: false }],
+      branches: [...get().branches, { id: crypto.randomUUID(), question_id: qId, condition: { field, operator: 'equals', value: '' }, target_question_id: null, is_end: false, sort_order: sortOrder }],
       isDirty: true,
-    }),
+    });
+  },
 
   updateBranch: (id, updates) =>
     set({ branches: get().branches.map((b) => (b.id === id ? { ...b, ...updates } : b)), isDirty: true }),
 
   removeBranch: (id) =>
     set({ branches: get().branches.filter((b) => b.id !== id), isDirty: true }),
+
+  reorderBranches: (questionId, from, to) => {
+    const qBranches = get()
+      .branches.filter((b) => b.question_id === questionId)
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    const [moved] = qBranches.splice(from, 1);
+    qBranches.splice(to, 0, moved);
+    const reindexed = new Map(qBranches.map((b, i) => [b.id, { ...b, sort_order: i }]));
+    set({
+      branches: get().branches.map((b) => reindexed.get(b.id) ?? b),
+      isDirty: true,
+    });
+  },
 
   updateScoringRule: (qId, updates) => {
     const rules = get().scoringRules;
@@ -656,6 +675,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
             condition: b.condition,
             target_question_id: b.target_question_id,
             is_end: b.is_end,
+            sort_order: b.sort_order ?? 0,
           })),
         );
         if (bInsErr) console.error('Insert branches failed:', bInsErr);

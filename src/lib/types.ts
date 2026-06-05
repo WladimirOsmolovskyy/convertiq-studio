@@ -43,7 +43,12 @@ export interface Question {
 export type BranchOperator = 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than';
 
 export interface BranchCondition {
-  field: string; // option_id or 'value'
+  /** Discriminates how `value` is matched at runtime:
+   *  - 'option' → `value` is an option id, tested against the answer's
+   *    `selected_options` (radio/checkbox/dropdown).
+   *  - 'value'  → `value` is a literal, compared against the free-text
+   *    `value` of the answer (text/textarea/email/number/rating). */
+  field: 'option' | 'value';
   operator: BranchOperator;
   value: string;
 }
@@ -54,6 +59,9 @@ export interface QuestionBranch {
   condition: BranchCondition;
   target_question_id: string | null;
   is_end: boolean;
+  /** Per-question evaluation order (first match wins). Branches are sorted by
+   *  this before evaluation; absent → falls back to insertion order. */
+  sort_order?: number;
 }
 
 /* ─── Scoring ───────────────────────────────────────────────────── */
