@@ -1,16 +1,25 @@
 'use client';
 
 /**
- * Variables panel — the GLOBAL design tokens (colors, typography, layout,
- * background, button, progress, presets). Lifted verbatim from the prior
- * single-panel Design tab. Per the new architecture these tokens are
- * treated as the "variables" namespace; the Inspector tab edits per-element
- * overrides that may reference them.
+ * Variables panel — the questionnaire's GLOBAL design tokens.
  *
- * No behavior changes in this extraction — same controls, same handlers.
+ * Scope (deliberately): the small set of tokens that actually drive the
+ * rendered questionnaire, each shown with its inherit/override state vs the
+ * project Brand palette:
+ *
+ *   Colors      — Background · Surface · Primary · Text · Muted (Brand-linked)
+ *   Typography  — Heading / Body: font · weight · size · line-height · spacing
+ *   Layout      — content width · radius · card padding · question spacing
+ *   Background  — page background mode (solid uses the Background color)
+ *
+ * Per-element styling (button, progress, options, inputs, card) lives in the
+ * Inspector tab — select the element on the canvas. This panel intentionally
+ * does NOT duplicate that.
  */
 
+import { RotateCcw, Link2 } from 'lucide-react';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
+import { resolveDesign } from '@/lib/designResolve';
 import editorStyles from '../editor.module.css';
 import designStyles from './design.module.css';
 
@@ -40,69 +49,77 @@ const WEIGHT_LABELS: Record<number, string> = {
   500: 'Medium', 600: 'Semi', 700: 'Bold', 800: 'ExBold', 900: 'Black',
 };
 
-/** Look up font definition by CSS value */
 function getFontDef(cssValue: string): FontDef {
   return FONTS.find(f => f.value === cssValue) || FONTS[0];
 }
 
-/* ── Helpers ───────────────────────────────────────────────────── */
-function hexToRgb(hex: string): [number, number, number] | null {
-  const m = hex.replace('#', '').match(/.{2}/g);
-  if (!m) return null;
-  return [parseInt(m[0], 16), parseInt(m[1], 16), parseInt(m[2], 16)];
-}
 function isValidHex(c: string) { return /^#[0-9a-fA-F]{6}$/.test(c); }
-function rgba(hex: string, alpha: number) {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return `rgba(0,0,0,${alpha})`;
-  return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`;
-}
-function adjustBrightness(hex: string, amount: number): string {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return hex;
-  const clamp = (v: number) => Math.min(255, Math.max(0, v));
-  return `#${[clamp(rgb[0] + amount), clamp(rgb[1] + amount), clamp(rgb[2] + amount)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
-}
-function isLight(hex: string): boolean {
-  const rgb = hexToRgb(hex);
-  if (!rgb) return true;
-  return (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255 > 0.55;
-}
 
-/* ── Safe accessors (backward-compat for old saved configs) ──── */
-function getBody(design: any) {
+/* ── Safe typography accessors (size/weight/line-height/spacing) ── */
+function getBody(design: { typography: { body?: { size?: number; weight?: number; lineHeight?: number; letterSpacing?: number }; baseFontSize?: number; lineHeight?: number } }) {
   return {
     size: design.typography.body?.size ?? design.typography.baseFontSize ?? 16,
     weight: design.typography.body?.weight ?? 400,
     lineHeight: design.typography.body?.lineHeight ?? design.typography.lineHeight ?? 1.6,
     letterSpacing: design.typography.body?.letterSpacing ?? 0,
-    color: design.typography.body?.color ?? design.colors.text ?? '#1d1d1f',
   };
 }
-function getHeading(design: any) {
+function getHeading(design: { typography: { heading?: { size?: number; weight?: number; lineHeight?: number; letterSpacing?: number }; baseFontSize?: number; headingWeight?: number } }) {
   return {
     size: design.typography.heading?.size ?? Math.round((design.typography.baseFontSize ?? 16) * 1.375),
     weight: design.typography.heading?.weight ?? design.typography.headingWeight ?? 700,
     lineHeight: design.typography.heading?.lineHeight ?? 1.2,
     letterSpacing: design.typography.heading?.letterSpacing ?? -0.02,
-    color: design.typography.heading?.color ?? design.colors.text ?? '#1d1d1f',
   };
 }
 
 /* ── Sub-components ────────────────────────────────────────────── */
-function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+/** A Brand-linked color token: swatch + name + hex, with inherit/override
+ *  state and a ↺ restore that clears the override back to Brand. */
+function ColorField({
+  label, value, onChange, overridden, onRestore, inheritLabel = 'Brand',
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  overridden?: boolean;
+  onRestore?: () => void;
+  inheritLabel?: string;
+}) {
   const displayColor = isValidHex(value) ? value : '#000000';
   return (
     <div className={editorStyles.colorField}>
       <div className={editorStyles.colorSwatch} style={{ backgroundColor: displayColor }}>
         <input type="color" value={displayColor} onChange={(e) => onChange(e.target.value)} />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.0625rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.0625rem', minWidth: 0 }}>
         <span className={editorStyles.colorLabel}>{label}</span>
         <span style={{ fontSize: '0.5625rem', color: 'var(--text-muted)', fontFamily: "'SF Mono', monospace" }}>
           {value.substring(0, 20)}
         </span>
       </div>
+      {onRestore && (
+        <span className={designStyles.colorFieldState}>
+          {overridden ? (
+            <>
+              <span className={designStyles.overrideDot} title="Overridden" />
+              <button
+                type="button"
+                className={designStyles.restoreBtn}
+                onClick={onRestore}
+                title={`Restore to ${inheritLabel}`}
+                aria-label={`Restore ${label} to ${inheritLabel}`}
+              >
+                <RotateCcw size={12} strokeWidth={2} />
+              </button>
+            </>
+          ) : (
+            <span className={designStyles.inheritChip} title={`Inheriting from ${inheritLabel}`}>
+              <Link2 size={11} strokeWidth={2} />
+            </span>
+          )}
+        </span>
+      )}
     </div>
   );
 }
@@ -126,7 +143,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h3 className={editorStyles.designSectionTitle}>{children}</h3>;
 }
 
-/** A font panel for Heading or Body with weight-aware controls */
+/** Heading or Body type style — font, weight, size, line-height, spacing.
+ *  Text COLOR is not here; it lives in the Colors section (Text token). */
 function FontPanel({
   title,
   fontValue, onFontChange,
@@ -134,7 +152,6 @@ function FontPanel({
   weight, onWeightChange,
   lineHeight, onLineHeightChange,
   letterSpacing, onLetterSpacingChange,
-  color, onColorChange,
   sizeMin = 10, sizeMax = 48,
 }: {
   title: string;
@@ -143,13 +160,10 @@ function FontPanel({
   weight: number; onWeightChange: (v: number) => void;
   lineHeight: number; onLineHeightChange: (v: number) => void;
   letterSpacing: number; onLetterSpacingChange: (v: number) => void;
-  color: string; onColorChange: (v: string) => void;
   sizeMin?: number; sizeMax?: number;
 }) {
-  const displayColor = isValidHex(color) ? color : '#000000';
   const fontDef = getFontDef(fontValue);
   const availableWeights = fontDef.weights;
-
   const snappedWeight = availableWeights.includes(weight)
     ? weight
     : availableWeights.reduce((prev, curr) => Math.abs(curr - weight) < Math.abs(prev - weight) ? curr : prev);
@@ -170,14 +184,8 @@ function FontPanel({
       background: 'var(--bg)', borderRadius: 'var(--radius-md)',
       border: '1px solid var(--border)', padding: '0.75rem', marginBottom: '0.5rem',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.625rem' }}>
+      <div style={{ marginBottom: '0.625rem' }}>
         <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text)' }}>{title}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-          <div className={editorStyles.colorSwatch} style={{ backgroundColor: displayColor, width: 20, height: 20, borderRadius: 5 }}>
-            <input type="color" value={displayColor} onChange={(e) => onColorChange(e.target.value)} />
-          </div>
-          <span style={{ fontSize: '0.625rem', fontFamily: "'SF Mono', monospace", color: 'var(--text-muted)' }}>{color}</span>
-        </div>
       </div>
 
       <div style={{ marginBottom: '0.5rem' }}>
@@ -236,85 +244,44 @@ function FontPanel({
 
 /* ── Main Component ────────────────────────────────────────────── */
 export default function VariablesPanel() {
-  const { design, updateDesign } = useQuestionnaireStore();
+  const { design, brand, updateDesign } = useQuestionnaireStore();
+  // Resolved view for DISPLAY — fields the questionnaire doesn't override
+  // show their inherited Brand value. Writes still set sparse overrides.
+  const r = resolveDesign(design, brand);
 
   const body = getBody(design);
   const heading = getHeading(design);
 
-  const syncColorsToComponents = (colors: typeof design.colors) => {
-    const bg = colors.background;
-    const primary = colors.primary;
-    const surface = colors.surface;
-    const light = isLight(isValidHex(bg) ? bg : '#ffffff');
-
-    updateDesign({
-      colors,
-      components: {
-        question: {
-          background: surface,
-          border: `1px solid ${light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
-          shadow: light ? '0 2px 8px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' : '0 4px 24px rgba(0,0,0,0.3)',
-          padding: '2rem',
-        },
-        option: {
-          background: light ? adjustBrightness(isValidHex(bg) ? bg : '#ffffff', -8) : 'rgba(255,255,255,0.04)',
-          hoverBackground: light ? adjustBrightness(isValidHex(bg) ? bg : '#ffffff', -16) : 'rgba(255,255,255,0.08)',
-          selectedBackground: rgba(isValidHex(primary) ? primary : '#007aff', 0.08),
-          border: `1px solid ${light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`,
-          selectedBorder: `1px solid ${rgba(isValidHex(primary) ? primary : '#007aff', 0.4)}`,
-        },
-        button: {
-          ...design.components.button,
-          background: primary,
-          color: isLight(isValidHex(primary) ? primary : '#007aff') ? '#000000' : '#ffffff',
-        },
-        progress: {
-          background: light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
-          fillColor: primary,
-          height: design.components.progress.height,
-        },
-        input: {
-          background: surface,
-          border: `1px solid ${light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`,
-          focusBorder: `1px solid ${primary}`,
-          borderRadius: design.components.input.borderRadius,
-        },
-      },
-      background: {
-        type: design.background.type,
-        value: design.background.type === 'solid' ? bg : design.background.value,
-      },
-    });
-  };
-
+  // Edit a color variable = override it at the questionnaire level. Other
+  // colors keep inheriting Brand; component colors re-derive at render.
   const handleColorChange = (key: keyof typeof design.colors, value: string) => {
-    const newColors = { ...design.colors, [key]: value };
-    if (key === 'primary') newColors.accent = value;
-    syncColorsToComponents(newColors);
+    const next = { ...design.colors, [key]: value };
+    if (key === 'primary') next.accent = value;
+    updateDesign({ colors: next });
   };
+  // Restore = clear the override (undefined) → inherit the Brand token again.
+  const restoreColorVar = (key: keyof typeof design.colors) =>
+    updateDesign({
+      colors: { ...design.colors, [key]: undefined, ...(key === 'primary' ? { accent: undefined } : {}) },
+    });
 
-  const updateBody = (updates: Partial<typeof body>) => {
-    const merged = { ...body, ...updates };
+  const updateBody = (updates: Partial<typeof body>) =>
     updateDesign({
       typography: {
         ...design.typography,
-        baseFontSize: merged.size,
-        lineHeight: merged.lineHeight,
-        body: merged,
+        baseFontSize: { ...body, ...updates }.size,
+        lineHeight: { ...body, ...updates }.lineHeight,
+        body: { ...design.typography.body, ...updates },
       },
     });
-  };
-
-  const updateHeading = (updates: Partial<typeof heading>) => {
-    const merged = { ...heading, ...updates };
+  const updateHeading = (updates: Partial<typeof heading>) =>
     updateDesign({
       typography: {
         ...design.typography,
-        headingWeight: merged.weight,
-        heading: merged,
+        headingWeight: { ...heading, ...updates }.weight,
+        heading: { ...design.typography.heading, ...updates },
       },
     });
-  };
 
   return (
     <div className={designStyles.variablesBody}>
@@ -322,10 +289,16 @@ export default function VariablesPanel() {
       <div className={editorStyles.designSection}>
         <SectionTitle>Colors</SectionTitle>
         <div className={editorStyles.colorGrid}>
-          <ColorField label="Primary" value={design.colors.primary} onChange={(v) => handleColorChange('primary', v)} />
-          <ColorField label="Secondary" value={design.colors.secondary} onChange={(v) => handleColorChange('secondary', v)} />
-          <ColorField label="Background" value={design.colors.background} onChange={(v) => handleColorChange('background', v)} />
-          <ColorField label="Surface" value={design.colors.surface} onChange={(v) => handleColorChange('surface', v)} />
+          <ColorField label="Background" value={r.colors.background} overridden={design.colors.background !== undefined}
+            onChange={(v) => handleColorChange('background', v)} onRestore={() => restoreColorVar('background')} />
+          <ColorField label="Surface" value={r.colors.surface} overridden={design.colors.surface !== undefined}
+            onChange={(v) => handleColorChange('surface', v)} onRestore={() => restoreColorVar('surface')} />
+          <ColorField label="Primary" value={r.colors.primary} overridden={design.colors.primary !== undefined}
+            onChange={(v) => handleColorChange('primary', v)} onRestore={() => restoreColorVar('primary')} />
+          <ColorField label="Text" value={r.colors.text} overridden={design.colors.text !== undefined}
+            onChange={(v) => handleColorChange('text', v)} onRestore={() => restoreColorVar('text')} />
+          <ColorField label="Muted" value={r.colors.textMuted} overridden={design.colors.textMuted !== undefined}
+            onChange={(v) => handleColorChange('textMuted', v)} onRestore={() => restoreColorVar('textMuted')} />
         </div>
       </div>
 
@@ -344,8 +317,6 @@ export default function VariablesPanel() {
           onLineHeightChange={(v) => updateHeading({ lineHeight: v })}
           letterSpacing={heading.letterSpacing}
           onLetterSpacingChange={(v) => updateHeading({ letterSpacing: v })}
-          color={heading.color}
-          onColorChange={(v) => updateHeading({ color: v })}
           sizeMin={14}
           sizeMax={48}
         />
@@ -361,8 +332,6 @@ export default function VariablesPanel() {
           onLineHeightChange={(v) => updateBody({ lineHeight: v })}
           letterSpacing={body.letterSpacing}
           onLetterSpacingChange={(v) => updateBody({ letterSpacing: v })}
-          color={body.color}
-          onColorChange={(v) => updateBody({ color: v })}
           sizeMin={10}
           sizeMax={26}
         />
@@ -371,15 +340,15 @@ export default function VariablesPanel() {
       {/* Layout */}
       <div className={editorStyles.designSection}>
         <SectionTitle>Layout</SectionTitle>
-        <SliderField label="Max Width" value={design.layout.maxWidth} onChange={(v) => updateDesign({ layout: { ...design.layout, maxWidth: v } })} min={400} max={1200} step={20} unit="px" />
-        <SliderField label="Padding" value={design.layout.padding} onChange={(v) => updateDesign({ layout: { ...design.layout, padding: v } })} min={0.5} max={4} step={0.25} unit="rem" />
-        <SliderField label="Border Radius" value={design.layout.borderRadius} onChange={(v) => updateDesign({ layout: { ...design.layout, borderRadius: v } })} min={0} max={30} unit="px" />
-        <SliderField label="Question Gap" value={design.layout.questionSpacing} onChange={(v) => updateDesign({ layout: { ...design.layout, questionSpacing: v } })} min={0.5} max={4} step={0.25} unit="rem" />
+        <SliderField label="Content Width" value={design.layout.maxWidth} onChange={(v) => updateDesign({ layout: { ...design.layout, maxWidth: v } })} min={400} max={1200} step={20} unit="px" />
+        <SliderField label="Corner Radius" value={design.layout.borderRadius} onChange={(v) => updateDesign({ layout: { ...design.layout, borderRadius: v } })} min={0} max={30} unit="px" />
+        <SliderField label="Card Padding" value={design.layout.padding} onChange={(v) => updateDesign({ layout: { ...design.layout, padding: v } })} min={0.5} max={4} step={0.25} unit="rem" />
+        <SliderField label="Question Spacing" value={design.layout.questionSpacing} onChange={(v) => updateDesign({ layout: { ...design.layout, questionSpacing: v } })} min={0.5} max={4} step={0.25} unit="rem" />
       </div>
 
-      {/* Background */}
+      {/* Page background */}
       <div className={editorStyles.designSection}>
-        <SectionTitle>Background</SectionTitle>
+        <SectionTitle>Page Background</SectionTitle>
         <div style={{ display: 'flex', gap: '0.375rem', marginBottom: '0.75rem' }}>
           {(['solid', 'gradient', 'image'] as const).map((t) => (
             <button key={t}
@@ -388,10 +357,10 @@ export default function VariablesPanel() {
                 background: {
                   type: t,
                   value: t === 'gradient'
-                    ? `linear-gradient(135deg, ${design.colors.background}, ${design.colors.primary})`
+                    ? `linear-gradient(135deg, ${r.colors.background}, ${r.colors.primary})`
                     : t === 'image'
                       ? (design.background.type === 'image' ? design.background.value : '')
-                      : design.colors.background,
+                      : r.colors.background,
                 },
               })}
             >
@@ -399,6 +368,11 @@ export default function VariablesPanel() {
             </button>
           ))}
         </div>
+        {design.background.type === 'solid' && (
+          <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+            Uses the <strong>Background</strong> color above.
+          </p>
+        )}
         {design.background.type === 'gradient' && (
           <input className="input" value={design.background.value}
             onChange={(e) => updateDesign({ background: { ...design.background, value: e.target.value } })}
@@ -446,56 +420,6 @@ export default function VariablesPanel() {
             )}
           </>
         )}
-      </div>
-
-      {/* Button */}
-      <div className={editorStyles.designSection}>
-        <SectionTitle>Button</SectionTitle>
-        <div className={editorStyles.colorGrid} style={{ marginBottom: '0.625rem' }}>
-          <ColorField label="Background" value={design.components.button.background}
-            onChange={(v) => updateDesign({ components: { ...design.components, button: { ...design.components.button, background: v, color: isLight(isValidHex(v) ? v : '#007aff') ? '#000000' : '#ffffff' } } })} />
-          <ColorField label="Text" value={design.components.button.color}
-            onChange={(v) => updateDesign({ components: { ...design.components, button: { ...design.components.button, color: v } } })} />
-        </div>
-        <SliderField label="Radius" value={design.components.button.borderRadius}
-          onChange={(v) => updateDesign({ components: { ...design.components, button: { ...design.components.button, borderRadius: v } } })} min={0} max={980} unit="px" />
-        <SliderField label="Font Size" value={design.components.button.fontSize}
-          onChange={(v) => updateDesign({ components: { ...design.components, button: { ...design.components.button, fontSize: v } } })} min={12} max={22} unit="px" />
-      </div>
-
-      {/* Progress Bar */}
-      <div className={editorStyles.designSection}>
-        <SectionTitle>Progress Bar</SectionTitle>
-        <div className={editorStyles.colorGrid} style={{ marginBottom: '0.625rem' }}>
-          <ColorField label="Track" value={design.components.progress.background}
-            onChange={(v) => updateDesign({ components: { ...design.components, progress: { ...design.components.progress, background: v } } })} />
-          <ColorField label="Fill" value={design.components.progress.fillColor}
-            onChange={(v) => updateDesign({ components: { ...design.components, progress: { ...design.components.progress, fillColor: v } } })} />
-        </div>
-        <SliderField label="Height" value={design.components.progress.height}
-          onChange={(v) => updateDesign({ components: { ...design.components, progress: { ...design.components.progress, height: v } } })} min={2} max={12} unit="px" />
-      </div>
-
-      {/* Presets */}
-      <div className={editorStyles.designSection}>
-        <SectionTitle>Presets</SectionTitle>
-        <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap' }}>
-          {[
-            { name: 'Light', dot: '#007aff', colors: { primary: '#007aff', secondary: '#5856d6', background: '#ffffff', surface: '#ffffff', text: '#1d1d1f', textMuted: '#6e6e73', accent: '#007aff', error: '#ff3b30', success: '#34c759' } },
-            { name: 'Dark', dot: '#1c1c1e', border: true, colors: { primary: '#0a84ff', secondary: '#bf5af2', background: '#1c1c1e', surface: '#2c2c2e', text: '#f5f5f7', textMuted: '#8e8e93', accent: '#0a84ff', error: '#ff453a', success: '#30d158' } },
-            { name: 'Warm', dot: 'linear-gradient(135deg, #ff6b6b, #ffa36b)', colors: { primary: '#ff6b6b', secondary: '#ffa36b', background: '#fefcfb', surface: '#ffffff', text: '#2d2d2d', textMuted: '#999999', accent: '#ff6b6b', error: '#ff4444', success: '#51cf66' } },
-            { name: 'Indigo', dot: 'linear-gradient(135deg, #6366f1, #8b5cf6)', colors: { primary: '#6366f1', secondary: '#8b5cf6', background: '#0a0a14', surface: '#12121e', text: '#eeeef5', textMuted: '#7777aa', accent: '#6366f1', error: '#ef4444', success: '#22c55e' } },
-          ].map(({ name, dot, border, colors }) => (
-            <button key={name} className="btn btn-ghost btn-sm" style={{ border: '1px solid var(--border)' }}
-              onClick={() => {
-                syncColorsToComponents({ ...design.colors, ...colors });
-                updateBody({ color: colors.text });
-                updateHeading({ color: colors.text });
-              }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: dot, display: 'inline-block', border: border ? '1px solid var(--border)' : 'none' }} /> {name}
-            </button>
-          ))}
-        </div>
       </div>
     </div>
   );

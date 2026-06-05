@@ -22,6 +22,7 @@ import PreviewRenderer from '../PreviewRenderer';
 import PreviewViewportShell from '../PreviewViewportShell';
 import VariablesPanel from './_VariablesPanel';
 import InspectorPanel from './_InspectorPanel';
+import { useResize } from '../result/_useResize';
 import styles from './design.module.css';
 
 type Tab = 'variables' | 'inspector';
@@ -30,6 +31,15 @@ export default function DesignEditor() {
   const store = useQuestionnaireStore();
   const [tab, setTab] = useState<Tab>('variables');
   const [selectedElementId, setSelectedElementId] = useState<ElementId | null>(null);
+
+  // Drag-resizable left rail, same hook + persistence as the Result editor.
+  const leftRail = useResize({
+    initial: 320,
+    min: 260,
+    max: 520,
+    direction: 1,
+    storageKey: 'cq.design.leftWidth',
+  });
 
   // Selecting on the canvas auto-switches to the Inspector tab so the user
   // sees the relevant properties immediately.
@@ -40,31 +50,38 @@ export default function DesignEditor() {
 
   return (
     <div className={styles.shell}>
-      <aside className={styles.leftPanel}>
-        <div className={styles.tabStrip}>
-          <button
-            type="button"
-            className={`${styles.tabBtn} ${tab === 'variables' ? styles.tabBtnActive : ''}`}
-            onClick={() => setTab('variables')}
-            aria-pressed={tab === 'variables'}
-          >
-            Variables
-          </button>
-          <button
-            type="button"
-            className={`${styles.tabBtn} ${tab === 'inspector' ? styles.tabBtnActive : ''}`}
-            onClick={() => setTab('inspector')}
-            aria-pressed={tab === 'inspector'}
-          >
-            Inspector
-          </button>
-        </div>
-        <div className={styles.panelBody}>
-          {tab === 'variables'
-            ? <VariablesPanel />
-            : <InspectorPanel selectedElementId={selectedElementId} />}
-        </div>
-      </aside>
+      <div className={styles.railWrap} style={{ width: leftRail.width }}>
+        <aside className={styles.leftPanel}>
+          <div className={styles.tabStrip}>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${tab === 'variables' ? styles.tabBtnActive : ''}`}
+              onClick={() => setTab('variables')}
+              aria-pressed={tab === 'variables'}
+            >
+              Variables
+            </button>
+            <button
+              type="button"
+              className={`${styles.tabBtn} ${tab === 'inspector' ? styles.tabBtnActive : ''}`}
+              onClick={() => setTab('inspector')}
+              aria-pressed={tab === 'inspector'}
+            >
+              Inspector
+            </button>
+          </div>
+          <div className={styles.panelBody}>
+            {tab === 'variables'
+              ? <VariablesPanel />
+              : <InspectorPanel selectedElementId={selectedElementId} />}
+          </div>
+        </aside>
+        <div
+          className={styles.resizeHandle}
+          onMouseDown={leftRail.onMouseDown}
+          aria-hidden
+        />
+      </div>
 
       <PreviewViewportShell>
         {store.questionnaire ? (
@@ -75,6 +92,7 @@ export default function DesignEditor() {
             scoringRules={store.scoringRules}
             resultPages={store.resultPages}
             design={store.design}
+            brand={store.brand}
             selectableMode
             selectedElementId={selectedElementId}
             onSelectElement={handleSelectElement}
