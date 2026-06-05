@@ -367,7 +367,7 @@ export default function DocsPage() {
                 <tr>
                   <td><code>operator</code></td>
                   <td>string</td>
-                  <td>For open questions: <code>equals</code>, <code>not_equals</code>, <code>contains</code>, <code>greater_than</code>, <code>less_than</code></td>
+                  <td>For open questions: <code>equals</code>, <code>not_equals</code>, <code>contains</code> (text/email); <code>equals</code>, <code>not_equals</code>, <code>greater_than</code>, <code>less_than</code> (number/rating)</td>
                 </tr>
                 <tr>
                   <td><code>value</code></td>
