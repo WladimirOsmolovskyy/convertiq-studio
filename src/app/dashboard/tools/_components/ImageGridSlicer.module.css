@@ -1,0 +1,202 @@
+.hiddenInput {
+  display: none;
+}
+
+.tool {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ─── Toolbar ──────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.875rem 1rem;
+  background: var(--surface-secondary);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-lg);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.field label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.field input {
+  width: 84px;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.9375rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-sm);
+}
+.field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.count {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ─── Tile list ────────────────────────────────────────────────── */
+.tileList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.4rem 0.3rem 0.45rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+.chip:hover {
+  border-color: var(--border-hover);
+}
+.chipSelected {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+}
+.swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.chipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+}
+.chipRemove:hover {
+  background: var(--fill-tertiary);
+  color: var(--text);
+}
+
+/* ─── Preview stage ────────────────────────────────────────────── */
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.canvasWrap {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  line-height: 0;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  user-select: none;
+}
+
+.image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 62vh;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+/* Children below are visual only — the overlay handles pointer input. */
+.gridLine,
+.cutStrip,
+.tile,
+.dragPreview {
+  position: absolute;
+  pointer-events: none;
+}
+
+.gridLine {
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.25);
+}
+
+.cutStrip {
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(0, 0, 0, 0.45),
+    rgba(0, 0, 0, 0.45) 4px,
+    rgba(255, 255, 255, 0.25) 4px,
+    rgba(255, 255, 255, 0.25) 8px
+  );
+}
+
+.tile {
+  border: 2px solid;
+  box-sizing: border-box;
+}
+.tileSelected {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px rgba(0, 0, 0, 0.25);
+}
+.tileLabel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 700;
+  color: #fff;
+  border-bottom-right-radius: var(--radius-xs);
+}
+
+.dragPreview {
+  border: 2px dashed;
+  background: rgba(255, 255, 255, 0.12);
+  box-sizing: border-box;
+}
+
+.hint {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+.warning {
+  font-size: 0.8125rem;
+  color: var(--error, #ff3b30);
+}
+.meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

@@ -202,7 +202,12 @@ export default function SidebarInner({
     {
       title: 'Tools',
       items: [
-        { label: 'All Tools', icon: <LayoutGrid {...ip} />, path: '/dashboard/tools' },
+        {
+          label: 'All Tools',
+          icon: <LayoutGrid {...ip} />,
+          path: '/dashboard/tools',
+          match: (p) => p === '/dashboard/tools' || p.startsWith('/dashboard/tools/'),
+        },
       ],
     },
     {
