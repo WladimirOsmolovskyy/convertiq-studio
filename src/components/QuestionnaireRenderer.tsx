@@ -501,7 +501,7 @@ export default function QuestionnaireRenderer({
       onClick={pageInteract.onClick}
       style={{
         background: getBackgroundCSS(),
-        color: d.typography.body?.color ?? d.colors.text,
+        color: d.colors.text,
         fontFamily: d.typography.fontFamily,
         fontSize: `${d.typography.body?.size ?? d.typography.baseFontSize}px`,
         fontWeight: d.typography.body?.weight ?? 400,
@@ -595,7 +595,7 @@ export default function QuestionnaireRenderer({
                     fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
                     lineHeight: d.typography.heading?.lineHeight ?? 1.2,
                     letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
-                    color: d.typography.heading?.color ?? d.colors.text,
+                    color: d.colors.text,
                     ...elementOverrideStyle(d, 'questionTitle'),
                   }}
                 >
@@ -702,7 +702,7 @@ export default function QuestionnaireRenderer({
                     fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
                     lineHeight: d.typography.heading?.lineHeight ?? 1.2,
                     letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
-                    color: d.typography.heading?.color ?? d.colors.text,
+                    color: d.colors.text,
                     ...elementOverrideStyle(d, 'questionTitle'),
                   }}
                 >
@@ -961,7 +961,7 @@ export default function QuestionnaireRenderer({
                         fontFamily: d.typography.headingFont,
                         fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
                         letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
-                        color: d.typography.heading?.color ?? d.colors.text,
+                        color: d.colors.text,
                       }}
                     >
                       Thank you!

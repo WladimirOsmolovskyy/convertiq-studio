@@ -87,7 +87,7 @@ export default function InspectorPanel({ selectedElementId }: Props) {
           <div className={styles.swatchInput}>
             <label
               className={styles.swatch}
-              style={fillValue ? { background: fillValue, backgroundImage: 'none' } : undefined}
+              style={fillValue ? { backgroundColor: fillValue, backgroundImage: 'none' } : undefined}
             >
               <input
                 type="color"

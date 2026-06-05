@@ -14,9 +14,38 @@
   overflow: hidden;
 }
 
-.leftPanel {
-  width: 320px;
+/* ─── Resizable rail (mirrors the Result editor's railWrap/handle) ─── */
+.railWrap {
+  position: relative;
+  display: flex;
+  height: 100%;
   flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.railWrap > .leftPanel {
+  flex: 1;
+}
+
+/** Handle sticks a few px past the rail edge for a generous hit area
+ *  without a visible bar at rest. */
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -3px;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 20;
+  background: transparent;
+  transition: background-color 0.15s var(--ease-out);
+}
+.resizeHandle:hover,
+.resizeHandle:active {
+  background: var(--accent);
+}
+
+.leftPanel {
   display: flex;
   flex-direction: column;
   background: var(--surface-elevated, var(--bg-secondary));
@@ -24,34 +53,35 @@
   min-height: 0;
 }
 
-/* ─── Tab strip ────────────────────────────────────────────────── */
+/* ─── Tab strip (mirrors the Result editor's Pages/Layers switcher) ── */
 .tabStrip {
   display: flex;
-  padding: 0.5rem 0.5rem 0;
-  gap: 0.25rem;
-  background: var(--surface-elevated, var(--bg-secondary));
-  border-bottom: 1px solid var(--separator);
+  gap: 4px;
+  padding: 10px 10px 6px;
   flex-shrink: 0;
 }
-
 .tabBtn {
   flex: 1;
-  padding: 0.4375rem 0.625rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-secondary);
+  padding: 7px 12px;
   background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
   cursor: pointer;
-  letter-spacing: -0.008em;
-  margin-bottom: -1px;
-  transition: color var(--duration-fast) var(--ease-out);
+  text-align: center;
+  transition: color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
 }
-.tabBtn:hover { color: var(--text); }
+.tabBtn:hover {
+  color: var(--text);
+}
 .tabBtnActive {
   color: var(--text);
-  border-bottom-color: var(--accent);
+  background: var(--fill-quaternary);
+  border-color: var(--separator);
 }
 
 .panelBody {
