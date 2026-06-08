@@ -27,12 +27,41 @@ You're working in a feature worktree (e.g. `~/Programming/convertiq-agent-N`). A
 
 ### Your land message IS the changelog
 
-Your commit subject is read verbatim into `CHANGELOG.md` on every staging deploy, and that changelog goes to the user's manager. So the message is documentation, not a note to yourself. Rules:
+Your commit subject is read **verbatim** into `CHANGELOG.md` on every staging deploy, and that changelog goes to the user's manager. Nobody re-reads the diff — the message is the only record. So it must be self-contained documentation, written so a non-engineer knows what changed without opening the code.
 
-- **Conventional format:** `type(scope): description` — `type ∈ {feat, fix, docs, refactor, chore}`.
-- **Describe the user-facing change in plain language** — what it does, feature-level. Good: `feat(design): add image background option with upload + fit controls`. Bad: `wip`, `updates`, `fix stuff`.
-- **Be faithful to the actual diff.** The changelog is generated from your message, NOT from the code — nobody re-reads the diff. So the message must accurately reflect what changed: don't undersell (omitting a real change) or oversell (claiming more than you did). If the diff does two things, that's two commits with two honest messages.
-- **One line.** No multi-paragraph bodies; the subject carries it.
+**Fixed structure — every line reads the same shape:**
+
+```
+type(scope): <imperative verb> <what changed in plain terms>
+```
+
+- `type ∈ {feat, fix, refactor, docs, chore}`
+- `scope` = the product area, so entries can be grouped later: `design`, `result`, `integrations`, `leads`, `audiences`, `tools`, `settings`, `infra`
+- Start with a verb (add / wire / fix / replace / remove / rename). Describe the **user-facing effect**, not the implementation.
+- **Length:** aim ≤ 70 characters, one line, lowercase after the colon, no trailing period.
+- One closely-related sub-part may follow with ` + ` (at most one): `feat(design): add image background + object-fit controls`.
+
+**How to split — one commit = one thing a reader would name:**
+
+- Split by user-facing **capability**, not by file or technical step.
+- If you'd need "and" to join two *unrelated* things → that's two commits.
+- A feature and its own migration = **one** commit (one capability). A feature plus an unrelated drive-by fix = **two**.
+- A pure internal refactor (no user-facing change) gets its own terse `refactor(scope):` commit so it's clearly not a feature.
+
+**Examples**
+
+Good:
+- `feat(integrations): add GoHighLevel OAuth connect + field mapping`
+- `fix(leads): keep search filter when switching audience tabs`
+- `refactor(result): consolidate inspector into one sectioned component`
+
+Too big — split it:
+- ✗ `feat: add background remover and fix lead search and tweak sidebar`
+- ✓ `feat(tools): add background remover with brush refinement`
+- ✓ `fix(leads): restore search after audience switch`
+- ✓ `refactor(design): make left sidebar resizable`
+
+**Be faithful to the diff.** Don't undersell (omitting a real change) or oversell (claiming more than you did). If you can't describe the commit in one ≤70-char line, it's doing too much — split it.
 
 ## What you don't do
 
