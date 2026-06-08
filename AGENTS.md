@@ -72,9 +72,24 @@ Too big — split it:
 
 ## After a sync
 
-Your worktree may be reset to the latest `staging` between tasks (the orchestrator runs `ciq-s sync`). When that happens, a **`SYNC_NOTES.md`** appears in your worktree root listing the commits + files that just landed.
+Your worktree may be reset to the latest `staging` between tasks (the orchestrator runs `ciq-s sync`). When that happens, a **`SYNC_NOTES.md`** appears in your worktree root.
 
-If `SYNC_NOTES.md` exists: read it first, account for those changes (especially edits to files you're working on), then delete it. Don't commit it — it's gitignored, but delete it so a stale note doesn't linger.
+**It lists OTHER agents' work, not yours.** Those commits were made by other sessions and merged into staging so your worktree stays current. Read them only to stay compatible with files you touch — then delete the file. **Never count anything in `SYNC_NOTES.md` as your own work**, and never repeat it in a handoff or status summary.
+
+## Writing a handoff
+
+When your context fills and the user asks for a handoff to the next session on your topic, summarize **only your own work** — never the synced-in changes from other agents.
+
+Include:
+1. **What you did this session** — drawn from *this conversation's* actions, not from git or `SYNC_NOTES.md`. This is the authoritative record of your work.
+2. **Open threads on your topic** — what's half-done, decisions pending, next steps.
+3. *(Optional continuity)* Prior shipped work on your **same topic/scope**, via:
+   ```bash
+   git log --pretty='- %s' | grep -E '\((design|brand)\)'   # ← use YOUR scope(s)
+   ```
+   Label this clearly as "previously shipped on this topic," distinct from what you did this session.
+
+Exclude anything outside your scope (other agents' result-page, logic, integrations, etc. work) even though it now exists in your worktree. If you're unsure what your scope is, it's stated in your brief — ask rather than guess.
 
 ## Worktree setup (first time only)
 
