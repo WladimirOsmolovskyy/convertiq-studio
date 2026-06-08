@@ -16,16 +16,14 @@ import {
   type BrandPalette,
   type BrandTokenId,
 } from '@/lib/types';
+import { isValidHex } from '@/lib/color';
+import ColorPicker from '@/components/ColorPicker';
 import dash from '../dashboard.module.css';
 import styles from './brand.module.css';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 const SAVE_DELAY = 600;
-
-function isValidHex(c: string) {
-  return /^#[0-9a-fA-F]{6}$/.test(c);
-}
 
 export default function BrandEditor({
   projectId,
@@ -39,6 +37,7 @@ export default function BrandEditor({
   const [palette, setPalette] = useState<Record<BrandTokenId, string>>(initialPalette);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState<SaveStatus>('idle');
+  const [picker, setPicker] = useState<{ id: BrandTokenId; label: string; rect: DOMRect } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persist = (next: Record<BrandTokenId, string>) => {
@@ -97,47 +96,74 @@ export default function BrandEditor({
 
               {!isCollapsed && (
                 <div className={styles.tokens}>
-                  {group.tokens.map((token) => {
-                    const value = palette[token.id];
-                    const display = isValidHex(value) ? value : '#000000';
-                    const isOverridden = value !== defaultBrandPalette[token.id];
-                    return (
-                      <div key={token.id} className={styles.tokenRow}>
-                        <div className={styles.swatch} style={{ backgroundColor: display }}>
-                          <input
-                            type="color"
-                            value={display}
-                            onChange={(e) => setToken(token.id, e.target.value)}
-                            aria-label={`${token.label} color`}
-                          />
-                        </div>
-                        <span className={styles.tokenLabel}>{token.label}</span>
-                        <input
-                          className={styles.hexInput}
-                          value={value}
-                          spellCheck={false}
-                          onChange={(e) => setToken(token.id, e.target.value)}
-                        />
-                        {isOverridden && (
-                          <button
-                            type="button"
-                            className={styles.resetBtn}
-                            onClick={() => setToken(token.id, defaultBrandPalette[token.id])}
-                            title="Reset to default"
-                            aria-label={`Reset ${token.label} to default`}
-                          >
-                            <RotateCcw size={12} strokeWidth={2} />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {group.tokens.map((token) => (
+                    <TokenRow
+                      key={token.id}
+                      label={token.label}
+                      value={palette[token.id]}
+                      isOverridden={palette[token.id] !== defaultBrandPalette[token.id]}
+                      active={picker?.id === token.id}
+                      onOpen={(rect) => setPicker({ id: token.id, label: token.label, rect })}
+                      onReset={() => setToken(token.id, defaultBrandPalette[token.id])}
+                    />
+                  ))}
                 </div>
               )}
             </section>
           );
         })}
       </div>
+
+      {picker && (
+        <ColorPicker
+          key={picker.id}
+          title={picker.label}
+          value={palette[picker.id]}
+          anchor={picker.rect}
+          onChange={(v) => setToken(picker.id, v)}
+          onClose={() => setPicker(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** One color token: a clickable row (swatch + name) that opens the color
+ *  picker, plus a ↺ reset when the value diverges from the default. */
+function TokenRow({
+  label, value, isOverridden, active, onOpen, onReset,
+}: {
+  label: string;
+  value: string;
+  isOverridden: boolean;
+  active: boolean;
+  onOpen: (rect: DOMRect) => void;
+  onReset: () => void;
+}) {
+  const display = isValidHex(value) ? value : '#000000';
+  return (
+    <div className={`${styles.tokenRow} ${active ? styles.tokenRowActive : ''}`}>
+      <button
+        type="button"
+        className={styles.tokenMain}
+        onClick={(e) => onOpen(e.currentTarget.getBoundingClientRect())}
+      >
+        <span className={styles.swatch}>
+          <span className={styles.swatchFill} style={{ backgroundColor: display }} />
+        </span>
+        <span className={styles.tokenLabel}>{label}</span>
+      </button>
+      {isOverridden && (
+        <button
+          type="button"
+          className={styles.resetBtn}
+          onClick={onReset}
+          title="Reset to default"
+          aria-label={`Reset ${label} to default`}
+        >
+          <RotateCcw size={12} strokeWidth={2} />
+        </button>
+      )}
     </div>
   );
 }

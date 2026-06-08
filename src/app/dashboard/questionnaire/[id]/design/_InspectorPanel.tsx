@@ -15,9 +15,11 @@
  * rendered as dead controls.
  */
 
+import { useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import type { ElementId, ElementStyles } from '@/lib/types';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
+import { parseColor, buildColor } from '@/lib/color';
 import styles from './design.module.css';
 
 const ELEMENT_LABELS: Record<ElementId, { label: string; scope?: string }> = {
@@ -84,26 +86,11 @@ export default function InspectorPanel({ selectedElementId }: Props) {
         </div>
 
         <FieldRow label="Fill" overridden={fillSet} onRestore={() => setStyle({ fill: undefined })}>
-          <div className={styles.swatchInput}>
-            <label
-              className={styles.swatch}
-              style={fillValue ? { backgroundColor: fillValue, backgroundImage: 'none' } : undefined}
-            >
-              <input
-                type="color"
-                value={/^#[0-9a-f]{6}$/i.test(fillValue) ? fillValue : '#ffffff'}
-                onChange={(e) => setStyle({ fill: e.target.value })}
-                style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
-              />
-            </label>
-            <input
-              className={styles.input}
-              style={{ border: 'none', padding: 0, background: 'transparent' }}
-              value={fillValue}
-              placeholder="Inherited"
-              onChange={(e) => setStyle({ fill: e.target.value || undefined })}
-            />
-          </div>
+          <FillControl
+            key={selectedElementId}
+            value={fillValue}
+            onChange={(v) => setStyle({ fill: v })}
+          />
         </FieldRow>
 
         <FieldRow label="Radius" overridden={radiusSet} onRestore={() => setStyle({ radius: undefined })}>
@@ -159,6 +146,68 @@ export default function InspectorPanel({ selectedElementId }: Props) {
         Empty fields inherit from the questionnaire variables and Brand.
       </p>
     </>
+  );
+}
+
+/** Fill = element background color + opacity. Empty value means "inherited"
+ *  (no override). Keeps local hex text so partial typing isn't clobbered;
+ *  remounted via `key` when the selected element changes. */
+function FillControl({
+  value, onChange,
+}: {
+  value: string;
+  onChange: (v: string | undefined) => void;
+}) {
+  const isSet = value !== '';
+  const { rgb, alpha } = parseColor(value || '#000000');
+  const [hexText, setHexText] = useState(isSet ? rgb : '');
+
+  const onPick = (newRgb: string) => {
+    setHexText(newRgb);
+    onChange(buildColor(newRgb, isSet ? alpha : 100));
+  };
+  const onHexText = (t: string) => {
+    setHexText(t);
+    if (t === '') onChange(undefined);
+    else if (/^#[0-9a-fA-F]{6}$/.test(t)) onChange(buildColor(t, isSet ? alpha : 100));
+  };
+
+  return (
+    <div className={styles.fillControl}>
+      <div className={styles.swatchInput}>
+        <label className={styles.swatch}>
+          {isSet && <span className={styles.swatchFill} style={{ backgroundColor: value }} />}
+          <input
+            type="color"
+            value={rgb}
+            onChange={(e) => onPick(e.target.value)}
+            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }}
+          />
+        </label>
+        <input
+          className={styles.input}
+          style={{ border: 'none', padding: 0, background: 'transparent' }}
+          value={hexText}
+          placeholder="Inherited"
+          spellCheck={false}
+          onChange={(e) => onHexText(e.target.value)}
+        />
+      </div>
+      {isSet && (
+        <div className={styles.fillOpacity}>
+          <input
+            type="range"
+            className={styles.opacitySlider}
+            min={0}
+            max={100}
+            value={alpha}
+            onChange={(e) => onChange(buildColor(rgb, Number(e.target.value)))}
+            aria-label="Fill opacity (%)"
+          />
+          <span className={styles.opacityPct}>{alpha}%</span>
+        </div>
+      )}
+    </div>
   );
 }
 

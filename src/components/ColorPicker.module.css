@@ -1,0 +1,179 @@
+/* ─── Color picker popover ─────────────────────────────────────── */
+.panel {
+  position: fixed;
+  z-index: 200;
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  background: var(--surface-elevated, var(--surface));
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.iconBtn:hover {
+  background: var(--fill-quaternary);
+  color: var(--text);
+}
+
+/* Saturation / Value square */
+.svArea {
+  position: relative;
+  width: 100%;
+  height: 150px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+}
+.svWhite,
+.svBlack {
+  position: absolute;
+  inset: 0;
+}
+.svWhite { background: linear-gradient(to right, #fff, rgba(255, 255, 255, 0)); }
+.svBlack { background: linear-gradient(to top, #000, rgba(0, 0, 0, 0)); }
+.svHandle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.4);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* Hue + alpha tracks */
+.hueTrack,
+.alphaTrack {
+  position: relative;
+  height: 12px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  touch-action: none;
+}
+.hueTrack {
+  background: linear-gradient(to right,
+    #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
+}
+.alphaTrack {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #c8c8c8 25%, transparent 25%),
+    linear-gradient(-45deg, #c8c8c8 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #c8c8c8 75%),
+    linear-gradient(-45deg, transparent 75%, #c8c8c8 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+}
+.alphaFill {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+}
+.trackHandle {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* Hex + opacity / format + eyedropper rows */
+.fields {
+  display: flex;
+  gap: 0.5rem;
+}
+.hexField {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.375rem 0.625rem;
+}
+.hexField:focus-within { border-color: var(--accent); }
+.hexHash {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+.hexInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  letter-spacing: 0.02em;
+}
+.hexInput:focus { outline: none; }
+
+.opacityField {
+  width: 58px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.375rem 0.5rem;
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  text-align: center;
+}
+.opacityField:focus { outline: none; border-color: var(--accent); }
+
+.formatBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.4375rem 0.75rem;
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.formatBtn:first-child { flex: 1; }
+.formatBtn:hover:not(:disabled) { border-color: var(--border-hover); }
+.formatBtn:disabled { opacity: 0.45; cursor: not-allowed; }

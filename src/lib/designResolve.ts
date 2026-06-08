@@ -65,7 +65,9 @@ function hexToRgb(hex: string): [number, number, number] | null {
   if (!m || m.length < 3) return null;
   return [parseInt(m[0], 16), parseInt(m[1], 16), parseInt(m[2], 16)];
 }
-function isValidHex(c: string) { return /^#[0-9a-fA-F]{6}$/.test(c); }
+/** Accepts `#rrggbb` or `#rrggbbaa` (brand colors may carry opacity). The
+ *  brightness/rgb helpers below read the first three pairs, ignoring alpha. */
+function isValidHex(c: string) { return /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(c); }
 function rgba(hex: string, alpha: number) {
   const rgb = hexToRgb(hex);
   if (!rgb) return `rgba(0,0,0,${alpha})`;
