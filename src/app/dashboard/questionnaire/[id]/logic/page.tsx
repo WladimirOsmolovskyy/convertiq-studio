@@ -17,17 +17,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import {
-  AlertTriangle,
-  Circle,
-  CornerDownRight,
-  CornerLeftUp,
-  Flag,
-  GitBranch,
-  GripVertical,
-  Plus,
-  X,
-} from 'lucide-react';
+import { AlertTriangle, CornerDownRight, GitBranch, GripVertical, Plus, X } from 'lucide-react';
+import FlowGraph from './FlowGraph';
 import styles from '../editor.module.css';
 
 const CHOICE_TYPES: QuestionType[] = ['radio', 'checkbox', 'dropdown'];
@@ -62,41 +53,6 @@ const trunc = (s: string, n = 30) => (s.length > n ? `${s.slice(0, n)}…` : s);
 const scrollToCard = (id: string) =>
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-/** Short human label for a branch's condition, e.g. is “Enterprise” or > 5.
- *  Empty when the branch is incomplete. */
-function conditionLabel(branch: QuestionBranch, q: Question): string {
-  if (branch.condition.value === '') return '';
-  const opLabel =
-    operatorOptions(q.type).find((o) => o.value === branch.condition.operator)?.label ??
-    branch.condition.operator;
-  if (branch.condition.field === 'option') {
-    const opt = q.options.find((o) => o.id === branch.condition.value);
-    return `${opLabel} “${trunc(opt?.label ?? branch.condition.value, 18)}”`;
-  }
-  return `${opLabel} ${trunc(branch.condition.value, 18)}`;
-}
-
-type ExitKind = 'forward' | 'back' | 'end' | 'broken' | 'default';
-
-/** Resolve where a branch leads, classified for the vertical exit tree.
- *  Pure: derived from arrays already in scope, no store writes. */
-function resolveExit(
-  branch: QuestionBranch,
-  questions: Question[],
-  fromIdx: number,
-): { kind: ExitKind; label: string; scrollId: string | null } {
-  if (branch.is_end) return { kind: 'end', label: 'End', scrollId: 'logic-end' };
-  if (!branch.target_question_id) return { kind: 'default', label: 'Next question', scrollId: null };
-  const to = questions.findIndex((t) => t.id === branch.target_question_id);
-  if (to < 0) return { kind: 'broken', label: 'Missing target', scrollId: null };
-  const label = `Q${to + 1}: ${trunc(questions[to].title, 24)}`;
-  return {
-    kind: to > fromIdx ? 'forward' : 'back',
-    label,
-    scrollId: `logic-q-${branch.target_question_id}`,
-  };
-}
-
 /** Questions involved in one audience's routing: questions whose branch tags
  *  this audience, plus everything reachable from them by following branch jump
  *  targets. Editor-only — used to filter the view, never the runtime flow. */
@@ -126,7 +82,7 @@ export default function LogicEditor() {
   const { questions, branches, audiences } = useQuestionnaireStore();
   const [activeAudience, setActiveAudience] = useState<string | null>(null);
 
-  // Editor-only view filter. Selecting an audience focuses the map + cards on
+  // Editor-only view filter. Selecting an audience focuses the graph + cards on
   // that audience's routing; it never affects what a respondent sees.
   const filterSet =
     activeAudience && audiences.some((a) => a.id === activeAudience)
@@ -184,19 +140,16 @@ export default function LogicEditor() {
               </div>
             )}
 
-            <details className={styles.flowOverview}>
-              <summary className={styles.flowOverviewSummary}>Overview map</summary>
-              <FlowMap questions={questions} branches={branches} highlightIds={filterSet} />
-            </details>
+            <FlowGraph
+              questions={questions}
+              branches={branches}
+              highlightIds={filterSet}
+              onSelectQuestion={(id) => scrollToCard(`logic-q-${id}`)}
+            />
 
             {questions.map((q, idx) => {
               if (filterSet && !filterSet.has(q.id)) return null;
-              return (
-                <div key={q.id}>
-                  <QuestionFlowCard q={q} idx={idx} />
-                  {idx < questions.length - 1 && <div className={styles.flowConnector} />}
-                </div>
-              );
+              return <QuestionFlowCard key={q.id} q={q} idx={idx} />;
             })}
 
             {filterSet && filterSet.size === 0 && (
@@ -204,18 +157,6 @@ export default function LogicEditor() {
                 <p>No branch tags this audience yet. Add a branch and set “tag as” to route respondents here.</p>
               </div>
             )}
-
-            <div className={styles.flowConnector} />
-            <div id="logic-end" className={styles.flowTerminal}>
-              <Flag size={18} strokeWidth={1.75} aria-hidden />
-              <div>
-                <div className={styles.flowTerminalTitle}>Results / End</div>
-                <div className={styles.flowTerminalDesc}>
-                  Score is calculated and a Result page is shown. Author result pages in the Result
-                  tab.
-                </div>
-              </div>
-            </div>
           </>
         )}
       </div>
@@ -223,132 +164,10 @@ export default function LogicEditor() {
   );
 }
 
-/* ─── Read-only flow map ─────────────────────────────────────────── */
-
-const NODE_W = 104;
-const NODE_H = 40;
-const NODE_Y = 96;
-const STEP = 132;
-const MAP_H = 150;
-
-function FlowMap({
-  questions,
-  branches,
-  highlightIds,
-}: {
-  questions: Question[];
-  branches: QuestionBranch[];
-  highlightIds: Set<string> | null;
-}) {
-  const nodes = [
-    ...questions.map((q, i) => ({ id: `logic-q-${q.id}`, qid: q.id as string | null, label: `Q${i + 1}`, title: q.title })),
-    { id: 'logic-end', qid: null as string | null, label: 'End', title: 'Results / End' },
-  ];
-  const endIdx = nodes.length - 1;
-  const cx = (i: number) => i * STEP + NODE_W / 2;
-  const width = nodes.length * STEP - (STEP - NODE_W);
-
-  // When a tab filter is active, dim everything not in the audience's subgraph.
-  const isDim = (idx: number) => {
-    if (!highlightIds) return false;
-    const n = nodes[idx];
-    return n.qid != null && !highlightIds.has(n.qid);
-  };
-
-  const jumps = branches
-    .map((b) => {
-      const from = questions.findIndex((q) => q.id === b.question_id);
-      if (from < 0) return null;
-      if (b.is_end) return { from, to: endIdx, kind: 'end' as const };
-      if (b.target_question_id) {
-        const to = questions.findIndex((q) => q.id === b.target_question_id);
-        if (to >= 0) return { from, to, kind: 'jump' as const };
-      }
-      return null;
-    })
-    .filter((j): j is { from: number; to: number; kind: 'end' | 'jump' } => j !== null);
-
-  return (
-    <div className={styles.flowMap}>
-      <svg width={width} height={MAP_H} role="img" aria-label="Flow overview">
-        <defs>
-          <marker id="fm-arrow-jump" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto">
-            <path d="M0,0 L8,4 L0,8 z" className={styles.flowMapArrowJump} />
-          </marker>
-          <marker id="fm-arrow-end" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto">
-            <path d="M0,0 L8,4 L0,8 z" className={styles.flowMapArrowEnd} />
-          </marker>
-        </defs>
-
-        {/* Default sequential edges */}
-        {nodes.slice(0, -1).map((_, i) => (
-          <line
-            key={`def-${i}`}
-            x1={i * STEP + NODE_W}
-            y1={NODE_Y + NODE_H / 2}
-            x2={(i + 1) * STEP}
-            y2={NODE_Y + NODE_H / 2}
-            className={styles.flowMapDefaultEdge}
-            style={highlightIds && (isDim(i) || isDim(i + 1)) ? { opacity: 0.15 } : undefined}
-          />
-        ))}
-
-        {/* Jump / end arcs */}
-        {jumps.map((j, i) => {
-          const x1 = cx(j.from);
-          const x2 = cx(j.to);
-          const arcH = Math.min(82, 26 + Math.abs(j.to - j.from) * 14);
-          const midX = (x1 + x2) / 2;
-          const d = `M ${x1} ${NODE_Y} Q ${midX} ${NODE_Y - arcH} ${x2} ${NODE_Y}`;
-          const dim = highlightIds && isDim(j.from) && isDim(j.to);
-          return (
-            <path
-              key={`jmp-${i}`}
-              d={d}
-              fill="none"
-              className={j.kind === 'end' ? styles.flowMapEndEdge : styles.flowMapJumpEdge}
-              markerEnd={j.kind === 'end' ? 'url(#fm-arrow-end)' : 'url(#fm-arrow-jump)'}
-              style={dim ? { opacity: 0.15 } : undefined}
-            />
-          );
-        })}
-
-        {/* Nodes */}
-        {nodes.map((n, i) => (
-          <g
-            key={n.id}
-            className={styles.flowMapNode}
-            onClick={() => scrollToCard(n.id)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') scrollToCard(n.id);
-            }}
-            style={isDim(i) ? { opacity: 0.25 } : undefined}
-          >
-            <title>{n.title}</title>
-            <rect
-              x={i * STEP}
-              y={NODE_Y}
-              width={NODE_W}
-              height={NODE_H}
-              rx={8}
-              className={i === endIdx ? styles.flowMapNodeRectEnd : styles.flowMapNodeRect}
-            />
-            <text x={cx(i)} y={NODE_Y + NODE_H / 2 + 4} textAnchor="middle" className={styles.flowMapNodeText}>
-              {n.label}
-            </text>
-          </g>
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-/* ─── Per-question card ──────────────────────────────────────────── */
+/* ─── Per-question card (editing surface) ────────────────────────── */
 
 function QuestionFlowCard({ q, idx }: { q: Question; idx: number }) {
-  const { questions, branches, addBranch, reorderBranches } = useQuestionnaireStore();
+  const { branches, addBranch, reorderBranches } = useQuestionnaireStore();
   const qBranches = branches
     .filter((b) => b.question_id === q.id)
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
@@ -364,9 +183,6 @@ function QuestionFlowCard({ q, idx }: { q: Question; idx: number }) {
     reorderBranches(q.id, from, to);
   };
 
-  const nextQ = idx < questions.length - 1 ? questions[idx + 1] : null;
-  const pathsIn = branches.filter((b) => b.target_question_id === q.id).length;
-
   return (
     <div id={`logic-q-${q.id}`} className={styles.flowQuestionNode}>
       <div className={styles.flowQuestionHead}>
@@ -378,7 +194,6 @@ function QuestionFlowCard({ q, idx }: { q: Question; idx: number }) {
             {q.required && ' • required'}
           </div>
         </div>
-        {pathsIn > 1 && <span className={styles.pathsInBadge}>{pathsIn} paths in</span>}
         <button className="btn btn-ghost btn-sm" onClick={() => addBranch(q.id)}>
           <Plus size={12} strokeWidth={2.25} /> Add branch
         </button>
@@ -394,83 +209,6 @@ function QuestionFlowCard({ q, idx }: { q: Question; idx: number }) {
             </div>
           </SortableContext>
         </DndContext>
-      )}
-
-      {/* Vertical exit tree — read-only visualization of where each branch leads */}
-      <div className={styles.branchTree}>
-        {qBranches.map((branch) => {
-          const cond = conditionLabel(branch, q);
-          const exit = resolveExit(branch, questions, idx);
-          return (
-            <ExitItem
-              key={branch.id}
-              cond={cond ? `if ${cond}` : 'incomplete'}
-              kind={exit.kind}
-              label={exit.label}
-              scrollId={exit.scrollId}
-            />
-          );
-        })}
-        <ExitItem
-          cond="otherwise"
-          kind={nextQ ? 'forward' : 'end'}
-          label={nextQ ? `Q${idx + 2}: ${trunc(nextQ.title, 24)}` : 'End (results)'}
-          scrollId={nextQ ? `logic-q-${nextQ.id}` : 'logic-end'}
-          muted
-        />
-      </div>
-    </div>
-  );
-}
-
-/* ─── Exit-tree item (read-only) ─────────────────────────────────── */
-
-function ExitItem({
-  cond,
-  kind,
-  label,
-  scrollId,
-  muted,
-}: {
-  cond: string;
-  kind: ExitKind;
-  label: string;
-  scrollId: string | null;
-  muted?: boolean;
-}) {
-  const icon =
-    kind === 'end' ? <Flag size={12} strokeWidth={2} aria-hidden /> :
-    kind === 'back' ? <CornerLeftUp size={12} strokeWidth={2} aria-hidden /> :
-    kind === 'broken' ? <AlertTriangle size={12} strokeWidth={2} aria-hidden /> :
-    kind === 'forward' ? <Circle size={9} strokeWidth={3} aria-hidden /> :
-    null;
-  const tone = muted
-    ? styles.chipMuted
-    : kind === 'end'
-      ? styles.chipEnd
-      : kind === 'back'
-        ? styles.chipBack
-        : kind === 'broken'
-          ? styles.chipBroken
-          : kind === 'forward'
-            ? styles.chipForward
-            : styles.chipMuted;
-  const chipBody = (
-    <>
-      {icon}
-      {label}
-    </>
-  );
-  return (
-    <div className={styles.branchTreeItem}>
-      <span className={styles.branchTreeCond}>{cond}</span>
-      <CornerDownRight size={12} strokeWidth={1.75} className={styles.branchTreeArrow} aria-hidden />
-      {scrollId ? (
-        <button type="button" className={`${styles.branchChip} ${tone}`} onClick={() => scrollToCard(scrollId)}>
-          {chipBody}
-        </button>
-      ) : (
-        <span className={`${styles.branchChip} ${tone}`}>{chipBody}</span>
       )}
     </div>
   );

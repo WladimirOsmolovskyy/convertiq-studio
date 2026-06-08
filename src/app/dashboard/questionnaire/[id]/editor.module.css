@@ -485,13 +485,6 @@
   min-width: 0;
 }
 
-.flowConnector {
-  width: 2px;
-  height: 20px;
-  background: var(--border-hover);
-  margin: 0 auto;
-}
-
 .branchRow {
   display: flex;
   align-items: center;
@@ -616,142 +609,6 @@
   flex-shrink: 0;
 }
 
-/* ─── Vertical exit tree (read-only) ───────────────────────────── */
-.branchTree {
-  margin-top: 0.625rem;
-  padding-left: 0.875rem;
-  border-left: 2px solid var(--border-hover);
-  display: flex;
-  flex-direction: column;
-  gap: 0.3125rem;
-  min-width: 0;
-}
-.branchTreeItem {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-width: 0;
-  font-size: 0.75rem;
-}
-.branchTreeItem::before {
-  content: '';
-  position: absolute;
-  left: -0.875rem;
-  top: 50%;
-  width: 0.625rem;
-  border-top: 2px solid var(--border-hover);
-}
-.branchTreeCond {
-  color: var(--text-muted);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.branchTreeArrow {
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-.branchChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.1875rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border: 1px solid transparent;
-  background: var(--surface-hover);
-  color: var(--text-secondary);
-  max-width: 100%;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: border-color var(--duration-fast) var(--ease-out);
-}
-button.branchChip {
-  cursor: pointer;
-}
-button.branchChip:hover {
-  border-color: currentColor;
-}
-.chipForward {
-  background: var(--accent-muted);
-  color: var(--accent);
-}
-.chipBack {
-  background: var(--surface-hover);
-  color: var(--text-muted);
-}
-.chipEnd {
-  background: var(--success-muted);
-  color: var(--success);
-}
-.chipBroken {
-  background: var(--error-muted);
-  color: var(--error);
-}
-.chipMuted {
-  background: var(--surface-hover);
-  color: var(--text-muted);
-}
-
-.pathsInBadge {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  background: var(--fill-quaternary);
-  padding: 0.125rem 0.4rem;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
-/* ─── Collapsible overview map ──────────────────────────────────── */
-.flowOverview {
-  margin-bottom: 1.5rem;
-}
-.flowOverviewSummary {
-  cursor: pointer;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  padding: 0.375rem 0;
-  list-style: none;
-  user-select: none;
-}
-.flowOverviewSummary::-webkit-details-marker {
-  display: none;
-}
-.flowOverview .flowMap {
-  margin-bottom: 0;
-  margin-top: 0.5rem;
-}
-
-/* ─── Terminal node ────────────────────────────────────────────── */
-.flowTerminal {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  background: var(--surface);
-  border: 1px solid var(--separator);
-  border-left: 3px solid var(--success);
-  border-radius: var(--radius-lg);
-  padding: 1rem;
-  box-shadow: var(--shadow-sm);
-}
-.flowTerminal svg {
-  color: var(--success);
-  flex-shrink: 0;
-}
-.flowTerminalTitle {
-  font-weight: 600;
-  color: var(--success);
-}
-.flowTerminalDesc {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
 /* ─── Per-audience view tabs ───────────────────────────────────── */
 .logicTabs {
   display: flex;
@@ -788,54 +645,140 @@ button.branchChip:hover {
   flex-shrink: 0;
 }
 
-/* ─── Read-only flow map ───────────────────────────────────────── */
-.flowMap {
-  overflow-x: auto;
-  padding: 0.5rem 0.25rem;
+/* ─── Node graph (read-only) ───────────────────────────────────── */
+.graphScroll {
+  overflow: auto;
+  max-height: 62vh;
   margin-bottom: 1.5rem;
   border: 1px solid var(--separator);
   border-radius: var(--radius-lg);
   background: var(--surface-hover);
 }
-.flowMapNode {
-  cursor: pointer;
+.graphCanvas {
+  position: relative;
 }
-.flowMapNodeRect {
-  fill: var(--surface);
-  stroke: var(--accent);
-  stroke-width: 1.5;
-}
-.flowMapNodeRectEnd {
-  fill: var(--success-muted);
-  stroke: var(--success);
-  stroke-width: 1.5;
-}
-.flowMapNode:hover .flowMapNodeRect {
-  fill: var(--accent-muted);
-}
-.flowMapNodeText {
-  fill: var(--text);
-  font-size: 0.75rem;
-  font-weight: 600;
+.graphEdges {
+  position: absolute;
+  top: 0;
+  left: 0;
   pointer-events: none;
 }
-.flowMapDefaultEdge {
+
+.graphNode {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+.graphNode:hover {
+  border-color: var(--accent);
+}
+.graphNodeHead {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.625rem;
+  border-bottom: 1px solid var(--separator);
+  background: var(--surface-hover);
+}
+.graphNodeNum {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.graphNodeTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.graphNodeType {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.graphPortRow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 0.625rem;
+}
+.graphPortLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.graphPort {
+  position: absolute;
+  right: -5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+}
+.graphEndNode {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--success-muted);
+  color: var(--success);
+  border: 1px solid var(--success);
+  border-radius: var(--radius-lg);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.graphEdgeDefault {
   stroke: var(--border-hover);
   stroke-width: 1.5;
 }
-.flowMapJumpEdge {
+.graphEdgeForward {
   stroke: var(--accent);
   stroke-width: 1.5;
 }
-.flowMapEndEdge {
-  stroke: var(--error);
+.graphEdgeBack {
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.graphEdgeEnd {
+  stroke: var(--success);
   stroke-width: 1.5;
 }
-.flowMapArrowJump {
+.graphArrowDefault {
+  fill: var(--border-hover);
+}
+.graphArrowForward {
   fill: var(--accent);
 }
-.flowMapArrowEnd {
-  fill: var(--error);
+.graphArrowBack {
+  fill: var(--text-muted);
+}
+.graphArrowEnd {
+  fill: var(--success);
 }
 
 /* ─── Design Panel ─────────────────────────────────────────────── */
