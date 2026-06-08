@@ -732,11 +732,21 @@
   right: -5px;
   top: 50%;
   transform: translateY(-50%);
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: var(--surface);
   border: 2px solid var(--accent);
+  cursor: grab;
+  touch-action: none;
+  transition: transform var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
+}
+.graphPort:hover {
+  background: var(--accent);
+  transform: translateY(-50%) scale(1.25);
+}
+.graphPort:active {
+  cursor: grabbing;
 }
 .graphEndNode {
   position: absolute;
@@ -779,6 +789,25 @@
 }
 .graphArrowEnd {
   fill: var(--success);
+}
+
+/* Drag-to-wire affordances */
+.graphWiring {
+  cursor: crosshair;
+  user-select: none;
+}
+.graphWiring .graphPort {
+  cursor: grabbing;
+}
+.graphNodeDrop {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-muted);
+}
+.graphEdgeWiring {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  pointer-events: none;
 }
 
 /* ─── Design Panel ─────────────────────────────────────────────── */

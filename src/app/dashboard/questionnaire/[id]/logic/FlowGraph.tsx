@@ -1,17 +1,21 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import type { Question, QuestionBranch } from '@/lib/types';
 import styles from '../editor.module.css';
 
 /**
- * Read-only, top-to-bottom node graph of the questionnaire flow.
+ * Top-to-bottom node graph of the questionnaire flow, with drag-to-wire.
  *
  * Predefined geometry (not a free canvas): questions are stacked in order, each
  * a node whose answers are ports on the right edge; branches are SVG edges
  * routed through a right-hand gutter. Positions are derived from the graph each
- * render — nothing is stored. This is the visual foundation; drag-to-connect
- * and drag-to-create land in a later phase.
+ * render — nothing is stored.
+ *
+ * Dragging an answer port wires logic: drop on a question = branch to it, drop
+ * on the End node = end branch, drop on empty space = create a new question and
+ * branch to it. Re-dragging an answer re-targets its existing branch.
  */
 
 const LEFT = 24;
@@ -23,6 +27,7 @@ const GAP = 34;
 const GUTTER = 176;
 const END_H = 46;
 const TOP = 8;
+const DRAG_THRESHOLD = 10;
 
 const CHOICE = ['radio', 'checkbox', 'dropdown'];
 const trunc = (s: string, n = 30) => (s.length > n ? `${s.slice(0, n)}…` : s);
@@ -31,6 +36,7 @@ type EdgeKind = 'default' | 'forward' | 'back' | 'end';
 type Port = { key: string; label: string; y: number; optionId: string | null };
 type GNode = { id: string; index: number; title: string; type: string; y: number; h: number; ports: Port[] };
 type GEdge = { id: string; d: string; kind: EdgeKind; fromQ: string; toQ: string | null };
+type Pending = { sourceQuestionId: string; optionId: string | null; fromX: number; fromY: number };
 
 const EDGE_CLASS: Record<EdgeKind, string> = {
   default: styles.graphEdgeDefault,
@@ -74,7 +80,6 @@ function buildLayout(questions: Question[], branches: QuestionBranch[]) {
   const endCenterY = endY + END_H / 2;
   const edges: GEdge[] = [];
 
-  // Faint default (fall-through) edges down the spine.
   for (let i = 0; i < nodes.length; i++) {
     const n = nodes[i];
     const toY = i < nodes.length - 1 ? nodes[i + 1].y : endY;
@@ -87,7 +92,6 @@ function buildLayout(questions: Question[], branches: QuestionBranch[]) {
     });
   }
 
-  // Branch edges, routed through the right gutter.
   for (const b of branches) {
     const src = byId.get(b.question_id);
     if (!src) continue;
@@ -137,16 +141,97 @@ export default function FlowGraph({
   highlightIds: Set<string> | null;
   onSelectQuestion: (id: string) => void;
 }) {
+  const connectBranch = useQuestionnaireStore((s) => s.connectBranch);
+  const addQuestion = useQuestionnaireStore((s) => s.addQuestion);
+
   const { nodes, edges, width, height, endY } = useMemo(
     () => buildLayout(questions, branches),
     [questions, branches],
   );
 
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [cursor, setCursor] = useState({ x: 0, y: 0 });
+  const [hoverId, setHoverId] = useState<string | null>(null);
+
   const isDim = (id: string | null) => !!highlightIds && id != null && !highlightIds.has(id);
 
+  // While a wire is in progress, track the pointer and resolve the drop.
+  useEffect(() => {
+    if (!pending) return;
+    const p = pending;
+
+    const canvasPoint = (e: PointerEvent) => {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      return rect ? { x: e.clientX - rect.left, y: e.clientY - rect.top } : { x: p.fromX, y: p.fromY };
+    };
+
+    const onMove = (e: PointerEvent) => {
+      setCursor(canvasPoint(e));
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      if (el?.closest('[data-endnode]')) setHoverId('__end__');
+      else {
+        const node = el?.closest('[data-qid]');
+        const qid = node?.getAttribute('data-qid') ?? null;
+        setHoverId(qid && qid !== p.sourceQuestionId ? qid : null);
+      }
+    };
+
+    const onUp = (e: PointerEvent) => {
+      const { x, y } = canvasPoint(e);
+      const moved = Math.hypot(x - p.fromX, y - p.fromY) > DRAG_THRESHOLD;
+      if (moved) {
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        if (el?.closest('[data-endnode]')) {
+          connectBranch(p.sourceQuestionId, p.optionId, { isEnd: true });
+        } else {
+          const targetId = el?.closest('[data-qid]')?.getAttribute('data-qid') ?? null;
+          if (targetId && targetId !== p.sourceQuestionId) {
+            connectBranch(p.sourceQuestionId, p.optionId, { questionId: targetId });
+          } else if (!targetId) {
+            const newId = addQuestion('radio');
+            connectBranch(p.sourceQuestionId, p.optionId, { questionId: newId });
+          }
+        }
+      }
+      setPending(null);
+      setHoverId(null);
+      // Clear after the trailing click so node-click-to-scroll stays suppressed.
+      setTimeout(() => {
+        draggingRef.current = false;
+      }, 0);
+    };
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPending(null);
+        setHoverId(null);
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [pending, connectBranch, addQuestion]);
+
+  const startWire = (e: React.PointerEvent, sourceQuestionId: string, optionId: string | null, fromY: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    draggingRef.current = true;
+    const fromX = LEFT + NODE_W;
+    setPending({ sourceQuestionId, optionId, fromX, fromY });
+    setCursor({ x: fromX, y: fromY });
+  };
+
   return (
-    <div className={styles.graphScroll}>
-      <div className={styles.graphCanvas} style={{ width, height }}>
+    <div className={`${styles.graphScroll} ${pending ? styles.graphWiring : ''}`}>
+      <div className={styles.graphCanvas} ref={canvasRef} style={{ width, height }}>
         <svg className={styles.graphEdges} width={width} height={height} aria-hidden>
           <defs>
             {EDGE_KINDS.map((k) => (
@@ -177,17 +262,28 @@ export default function FlowGraph({
               />
             );
           })}
+          {pending && (
+            <path
+              d={`M ${pending.fromX} ${pending.fromY} C ${pending.fromX + 60} ${pending.fromY}, ${cursor.x - 60} ${cursor.y}, ${cursor.x} ${cursor.y}`}
+              fill="none"
+              className={styles.graphEdgeWiring}
+            />
+          )}
         </svg>
 
         {nodes.map((n) => (
           <div
             key={n.id}
-            className={styles.graphNode}
+            data-qid={n.id}
+            className={`${styles.graphNode} ${hoverId === n.id ? styles.graphNodeDrop : ''}`}
             style={{ left: LEFT, top: n.y, width: NODE_W, opacity: isDim(n.id) ? 0.3 : 1 }}
             role="button"
             tabIndex={0}
             title={n.title}
-            onClick={() => onSelectQuestion(n.id)}
+            onClick={() => {
+              if (draggingRef.current) return;
+              onSelectQuestion(n.id);
+            }}
             onKeyDown={(ev) => {
               if (ev.key === 'Enter' || ev.key === ' ') onSelectQuestion(n.id);
             }}
@@ -200,14 +296,19 @@ export default function FlowGraph({
             {n.ports.map((p) => (
               <div key={p.key} className={styles.graphPortRow} style={{ height: ROW_H }}>
                 <span className={styles.graphPortLabel}>{trunc(p.label, 24)}</span>
-                <span className={styles.graphPort} aria-hidden />
+                <span
+                  className={styles.graphPort}
+                  title="Drag to connect"
+                  onPointerDown={(e) => startWire(e, n.id, p.optionId, p.y)}
+                />
               </div>
             ))}
           </div>
         ))}
 
         <div
-          className={styles.graphEndNode}
+          data-endnode=""
+          className={`${styles.graphEndNode} ${hoverId === '__end__' ? styles.graphNodeDrop : ''}`}
           style={{ left: LEFT, top: endY, width: NODE_W, height: END_H }}
         >
           Results / End

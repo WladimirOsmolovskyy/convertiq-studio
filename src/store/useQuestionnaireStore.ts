@@ -64,7 +64,9 @@ interface QuestionnaireState {
   /** Merge a Partial&lt;ElementStyles&gt; into design.elements[id]. Creates
    *  the override object if missing. Used by the Inspector panel. */
   updateElementStyle: (elementId: ElementId, partial: Partial<ElementStyles>) => void;
-  addQuestion: (type: Question['type']) => void;
+  /** Append a question; returns the new question's id (used by the node
+   *  graph to wire a branch to a freshly-created question). */
+  addQuestion: (type: Question['type']) => string;
   updateQuestion: (id: string, updates: Partial<Question>) => void;
   removeQuestion: (id: string) => void;
   reorderQuestions: (fromIndex: number, toIndex: number) => void;
@@ -76,6 +78,15 @@ interface QuestionnaireState {
   updateBranch: (id: string, updates: Partial<QuestionBranch>) => void;
   removeBranch: (id: string) => void;
   reorderBranches: (questionId: string, fromIndex: number, toIndex: number) => void;
+  /** Wire an answer to a target by graph drag. For a choice answer (optionId
+   *  set) it find-or-updates the branch for that option so re-dragging
+   *  re-targets instead of duplicating; for an open question (optionId null)
+   *  it appends a new value-condition branch. */
+  connectBranch: (
+    sourceQuestionId: string,
+    optionId: string | null,
+    target: { questionId: string } | { isEnd: true },
+  ) => void;
   updateScoringRule: (questionId: string, updates: Partial<ScoringRule>) => void;
   addResultPage: () => void;
   /** Append a result page seeded from a global template (id from
@@ -226,6 +237,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
       ai_prompt: '',
     };
     set({ questions: [...questions, newQ], scoringRules: [...get().scoringRules, newRule], isDirty: true });
+    return newQ.id;
   },
 
   updateQuestion: (id, updates) =>
@@ -304,6 +316,48 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
 
   removeBranch: (id) =>
     set({ branches: get().branches.filter((b) => b.id !== id), isDirty: true }),
+
+  connectBranch: (sourceQuestionId, optionId, target) => {
+    const targetPatch =
+      'isEnd' in target
+        ? { target_question_id: null, is_end: true }
+        : { target_question_id: target.questionId, is_end: false };
+
+    const branches = get().branches;
+    // Choice answer: re-target the existing branch for that option if present.
+    if (optionId != null) {
+      const existing = branches.find(
+        (b) => b.question_id === sourceQuestionId && b.condition.field === 'option' && b.condition.value === optionId,
+      );
+      if (existing) {
+        set({
+          branches: branches.map((b) => (b.id === existing.id ? { ...b, ...targetPatch } : b)),
+          isDirty: true,
+        });
+        return;
+      }
+    }
+
+    const sortOrder = branches.filter((b) => b.question_id === sourceQuestionId).length;
+    const condition =
+      optionId != null
+        ? { field: 'option' as const, operator: 'equals' as const, value: optionId }
+        : { field: 'value' as const, operator: 'equals' as const, value: '' };
+    set({
+      branches: [
+        ...branches,
+        {
+          id: crypto.randomUUID(),
+          question_id: sourceQuestionId,
+          condition,
+          sort_order: sortOrder,
+          assign_audience_id: null,
+          ...targetPatch,
+        },
+      ],
+      isDirty: true,
+    });
+  },
 
   reorderBranches: (questionId, from, to) => {
     const qBranches = get()
