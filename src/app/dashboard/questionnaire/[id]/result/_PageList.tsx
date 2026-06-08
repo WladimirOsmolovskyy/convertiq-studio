@@ -6,9 +6,11 @@
  * button at the bottom.
  */
 
+import { useState } from 'react';
 import { Flag, Plus, X } from 'lucide-react';
 import type { ResultPage } from '@/lib/types';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
+import TemplateGallery from './_TemplateGallery';
 import styles from './result.module.css';
 
 interface Props {
@@ -20,19 +22,13 @@ interface Props {
 }
 
 export default function PageList({ pages, selectedPageId, onSelect, filter }: Props) {
-  const { addResultPage, removeResultPage } = useQuestionnaireStore();
+  const { removeResultPage } = useQuestionnaireStore();
+  const [galleryOpen, setGalleryOpen] = useState(false);
 
   const f = filter.trim().toLowerCase();
   const visible = f
     ? pages.filter((p) => p.name.toLowerCase().includes(f))
     : pages;
-
-  const handleAdd = () => {
-    addResultPage();
-    const fresh = useQuestionnaireStore.getState().resultPages;
-    const newest = fresh[fresh.length - 1];
-    if (newest) onSelect(newest.id);
-  };
 
   const handleRemove = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -88,9 +84,16 @@ export default function PageList({ pages, selectedPageId, onSelect, filter }: Pr
         })
       )}
 
-      <button className={styles.addPageBtn} onClick={handleAdd}>
+      <button className={styles.addPageBtn} onClick={() => setGalleryOpen(true)}>
         <Plus size={12} strokeWidth={2.25} /> Add page
       </button>
+
+      {galleryOpen && (
+        <TemplateGallery
+          onClose={() => setGalleryOpen(false)}
+          onCreated={(id) => onSelect(id)}
+        />
+      )}
     </div>
   );
 }

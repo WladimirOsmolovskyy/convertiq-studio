@@ -18,7 +18,9 @@
 
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactElement } from 'react';
 import type {
+  BrandPalette,
   DesignConfig,
+  ResultColor,
   ResultFrameNode,
   ResultImageNode,
   ResultNode,
@@ -26,12 +28,17 @@ import type {
   ResultSize,
   ResultTextNode,
 } from '@/lib/types';
+import { isColorRef, resolveBrandToken } from '@/lib/types';
 import { resolveSpans, type ResultRenderContext } from '@/lib/resultVariables';
 
 export interface ResultPageRendererProps {
   page: ResultPage;
   ctx: ResultRenderContext;
   design: DesignConfig;
+  /** Project Brand palette. Node colors bound to a Brand token (`{ $var }`)
+   *  resolve against this, so the page stays on-brand and follows palette
+   *  edits. Literal node colors ignore it. */
+  brand?: BrandPalette;
   /** Editor mode: when set, every rendered node gets a click handler that
    *  calls `onSelectNode(id)`, and the node whose id matches `selectedNodeId`
    *  is outlined. Omit for production/public rendering. */
@@ -42,8 +49,20 @@ export interface ResultPageRendererProps {
 interface RenderEnv {
   ctx: ResultRenderContext;
   design: DesignConfig;
+  brand?: BrandPalette;
   selectedNodeId?: string | null;
   onSelectNode?: (id: string) => void;
+}
+
+/** Resolve a node color value to a CSS string: a Brand-token binding resolves
+ *  against the palette; a literal passes through; absent stays undefined. */
+function resolveColor(
+  v: ResultColor | undefined,
+  brand: BrandPalette | undefined,
+): string | undefined {
+  if (v == null) return undefined;
+  if (isColorRef(v)) return resolveBrandToken(brand, v.$var);
+  return v;
 }
 
 interface EditorAttrs {
@@ -125,7 +144,7 @@ function renderFrame(
     paddingLeft: `${node.padding.left}px`,
     alignItems: ALIGN_TO_FLEX[node.align],
     justifyContent: JUSTIFY_TO_FLEX[node.justify],
-    background: node.background,
+    background: resolveColor(node.background, env.brand),
     borderRadius: node.borderRadius != null ? `${node.borderRadius}px` : undefined,
     boxSizing: 'border-box',
     ...sizeStyle('width', node.width, parentDirection),
@@ -158,7 +177,7 @@ function renderText(
     fontWeight: node.fontWeight,
     lineHeight: node.lineHeight,
     letterSpacing: node.letterSpacing != null ? `${node.letterSpacing}em` : undefined,
-    color: node.color || env.design.colors.text,
+    color: resolveColor(node.color, env.brand) || env.design.colors.text,
     textAlign: node.textAlign,
     whiteSpace: 'pre-wrap',
     ...sizeStyle('width', node.width, parentDirection),
@@ -249,10 +268,11 @@ export default function ResultPageRenderer({
   page,
   ctx,
   design,
+  brand,
   selectedNodeId,
   onSelectNode,
 }: ResultPageRendererProps) {
-  const env: RenderEnv = { ctx, design, selectedNodeId, onSelectNode };
+  const env: RenderEnv = { ctx, design, brand, selectedNodeId, onSelectNode };
   // Center the root frame inside a max-width container so result pages feel
   // visually consistent with the rest of the questionnaire. The root frame
   // can still set its own width if the author overrides it.

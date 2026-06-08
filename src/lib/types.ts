@@ -118,6 +118,23 @@ export interface ResultPadding {
   left: number;
 }
 
+/** A result-node color bound to a project Brand token. Resolved against the
+ *  project palette at render time (see ResultPageRenderer). Detaching a
+ *  binding replaces it with a literal CSS color string. */
+export interface ColorRef {
+  $var: BrandTokenId;
+}
+
+/** A result-node color: either a literal CSS color/gradient string, or a live
+ *  binding to a Brand token. Templates ship bound by semantic meaning; authors
+ *  can detach to a literal or re-link to another token. */
+export type ResultColor = string | ColorRef;
+
+/** Type guard: is this color value a Brand-token binding (vs. a literal)? */
+export function isColorRef(v: ResultColor | undefined): v is ColorRef {
+  return typeof v === 'object' && v !== null && '$var' in v;
+}
+
 interface ResultNodeBase {
   id: string;
   width?: ResultSize;
@@ -134,8 +151,8 @@ export interface ResultFrameNode extends ResultNodeBase {
   align: 'start' | 'center' | 'end' | 'stretch';
   /** Main-axis alignment */
   justify: 'start' | 'center' | 'end' | 'space-between';
-  /** CSS color or gradient. */
-  background?: string;
+  /** Literal CSS color/gradient, or a live Brand-token binding. */
+  background?: ResultColor;
   borderRadius?: number;
   children: ResultNode[];
 }
@@ -148,7 +165,8 @@ export interface ResultTextNode extends ResultNodeBase {
   lineHeight?: number;
   /** em */
   letterSpacing?: number;
-  color?: string;
+  /** Literal CSS color, or a live Brand-token binding. */
+  color?: ResultColor;
   textAlign?: 'left' | 'center' | 'right';
   fontFamily?: string;
 }

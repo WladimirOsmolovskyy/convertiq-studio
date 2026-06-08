@@ -36,6 +36,7 @@ import {
   ChevronDown,
   Hash,
   ImagePlus,
+  Link2,
   Loader2,
   Mail,
   Maximize2,
@@ -45,10 +46,14 @@ import {
   SquareDashed,
   Trash2,
   Type,
+  Unlink,
   X,
 } from 'lucide-react';
 import { uploadResultImage } from '@/lib/storage/resultImages';
 import type {
+  BrandPalette,
+  BrandTokenId,
+  ResultColor,
   ResultFrameNode,
   ResultImageNode,
   ResultNode,
@@ -57,6 +62,7 @@ import type {
   ResultTextNode,
   TextSpan,
 } from '@/lib/types';
+import { BRAND_GROUPS, isColorRef, resolveBrandToken } from '@/lib/types';
 import { canMoveNode, findNode } from '@/lib/resultPage';
 import { listAvailableVariables, type AvailableVariable } from '@/lib/resultVariables';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
@@ -73,6 +79,7 @@ export default function Inspector({ page, selectedNodeId }: Props) {
   const {
     questionnaire,
     questions,
+    brand,
     updateResultPage,
     updateResultPageNode,
     removeResultPageNode,
@@ -134,10 +141,10 @@ export default function Inspector({ page, selectedNodeId }: Props) {
       )}
 
       {selectedNode.type === 'frame' && (
-        <FrameProps node={selectedNode} patch={patch} />
+        <FrameProps node={selectedNode} patch={patch} brand={brand} />
       )}
       {selectedNode.type === 'text' && (
-        <TextProps node={selectedNode} patch={patch} variables={variables} />
+        <TextProps node={selectedNode} patch={patch} variables={variables} brand={brand} />
       )}
       {selectedNode.type === 'image' && (
         <ImageProps node={selectedNode} patch={patch} />
@@ -222,9 +229,11 @@ function PagePropsSection({
 function FrameProps({
   node,
   patch,
+  brand,
 }: {
   node: ResultFrameNode;
   patch: (p: Partial<ResultNode>) => void;
+  brand: BrandPalette;
 }) {
   const [linkedPadding, setLinkedPadding] = useState(
     node.padding.top === node.padding.right &&
@@ -358,9 +367,10 @@ function FrameProps({
           />
         </PropRow>
         <PropRow label="Fill" leadingPlus>
-          <ColorField
-            value={node.background ?? ''}
-            onChange={(v) => patch({ background: v || undefined })}
+          <BindableColor
+            value={node.background}
+            brand={brand}
+            onChange={(v) => patch({ background: v })}
           />
         </PropRow>
         <PropRow label="Overflow" leadingPlus>
@@ -400,10 +410,12 @@ function TextProps({
   node,
   patch,
   variables,
+  brand,
 }: {
   node: ResultTextNode;
   patch: (p: Partial<ResultNode>) => void;
   variables: AvailableVariable[];
+  brand: BrandPalette;
 }) {
   const literalText = node.spans
     .filter((s): s is { type: 'text'; value: string } => s.type === 'text')
@@ -477,9 +489,10 @@ function TextProps({
 
       <Section title="Styles">
         <PropRow label="Color" leadingPlus>
-          <ColorField
-            value={node.color ?? ''}
-            onChange={(v) => patch({ color: v || undefined })}
+          <BindableColor
+            value={node.color}
+            brand={brand}
+            onChange={(v) => patch({ color: v })}
           />
         </PropRow>
       </Section>
@@ -893,6 +906,173 @@ function ColorField({
         placeholder={placeholder}
       />
     </div>
+  );
+}
+
+/* ─── Bindable color (literal ⇄ Brand token) ───────────────────── */
+
+const BRAND_TOKEN_LABELS: Record<string, string> = Object.fromEntries(
+  BRAND_GROUPS.flatMap((g) => g.tokens.map((t) => [t.id, t.label])),
+);
+
+/** Color control that is EITHER bound to a project Brand token (live, stays
+ *  on-brand and follows palette edits) OR a detached literal. Bound → token
+ *  chip + unlink; literal → color picker + a link button. The link/chip opens
+ *  a Brand-token menu to connect or re-link by semantic meaning. */
+function BindableColor({
+  value,
+  brand,
+  onChange,
+}: {
+  value: ResultColor | undefined;
+  brand: BrandPalette;
+  onChange: (v: ResultColor | undefined) => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
+
+  const pickToken = (token: BrandTokenId) => {
+    onChange({ $var: token });
+    setMenuOpen(false);
+  };
+
+  if (isColorRef(value)) {
+    const resolved = resolveBrandToken(brand, value.$var);
+    return (
+      <div className={styles.bindColor}>
+        <button
+          ref={anchorRef}
+          type="button"
+          className={styles.bindColorChip}
+          onClick={() => setMenuOpen(true)}
+          title="Connected to a brand variable — click to change"
+        >
+          <span className={styles.colorSwatch} style={{ background: resolved }} />
+          <span className={styles.bindColorChipLabel}>
+            {BRAND_TOKEN_LABELS[value.$var] ?? value.$var}
+          </span>
+          <ChevronDown size={11} strokeWidth={1.75} />
+        </button>
+        <button
+          type="button"
+          className={styles.bindColorBtn}
+          onClick={() => onChange(resolved)}
+          title="Detach from brand"
+          aria-label="Detach from brand"
+        >
+          <Unlink size={12} strokeWidth={1.75} />
+        </button>
+        {menuOpen && (
+          <BrandTokenMenu
+            brand={brand}
+            anchorRef={anchorRef}
+            activeToken={value.$var}
+            onPick={pickToken}
+            onClose={() => setMenuOpen(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.bindColor}>
+      <ColorField
+        value={typeof value === 'string' ? value : ''}
+        onChange={(v) => onChange(v || undefined)}
+      />
+      <button
+        ref={anchorRef}
+        type="button"
+        className={styles.bindColorBtn}
+        onClick={() => setMenuOpen(true)}
+        title="Connect to a brand variable"
+        aria-label="Connect to a brand variable"
+      >
+        <Link2 size={12} strokeWidth={1.75} />
+      </button>
+      {menuOpen && (
+        <BrandTokenMenu
+          brand={brand}
+          anchorRef={anchorRef}
+          onPick={pickToken}
+          onClose={() => setMenuOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Portal-anchored menu of Brand tokens, grouped + swatched, for connecting a
+ *  result-node color to a project global variable. */
+function BrandTokenMenu({
+  brand,
+  anchorRef,
+  activeToken,
+  onPick,
+  onClose,
+}: {
+  brand: BrandPalette;
+  anchorRef: React.RefObject<HTMLElement | null>;
+  activeToken?: BrandTokenId;
+  onPick: (t: BrandTokenId) => void;
+  onClose: () => void;
+}) {
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  useEffect(() => {
+    const MENU_W = 220;
+    const MENU_H = 360;
+    const GAP = 4;
+    const el = anchorRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    let left = r.right - MENU_W;
+    let top = r.bottom + GAP;
+    if (left < 8) left = 8;
+    if (top + MENU_H > window.innerHeight - 8) {
+      top = Math.max(8, r.top - MENU_H - GAP);
+    }
+    setPos({ top, left });
+  }, [anchorRef]);
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <>
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 1000 }} />
+      <div
+        className={styles.brandTokenMenu}
+        style={
+          {
+            position: 'fixed',
+            top: pos?.top ?? -9999,
+            left: pos?.left ?? -9999,
+            visibility: pos ? 'visible' : 'hidden',
+          } as CSSProperties
+        }
+      >
+        {BRAND_GROUPS.map((group) => (
+          <div key={group.id} className={styles.brandTokenGroup}>
+            <div className={styles.brandTokenGroupTitle}>{group.label}</div>
+            {group.tokens.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`${styles.brandTokenItem} ${activeToken === t.id ? styles.brandTokenItemActive : ''}`}
+                onClick={() => onPick(t.id)}
+              >
+                <span
+                  className={styles.colorSwatch}
+                  style={{ background: resolveBrandToken(brand, t.id) }}
+                />
+                <span className={styles.brandTokenItemLabel}>{t.label}</span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </>,
+    document.body,
   );
 }
 

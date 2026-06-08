@@ -147,6 +147,7 @@ export default function Canvas({ page, selectedNodeId, onSelectNode }: Props) {
           page={page}
           ctx={sampleCtx}
           design={resolvedDesign}
+          brand={brand}
           selectedNodeId={selectedNodeId}
           onSelectNode={onSelectNode}
         />

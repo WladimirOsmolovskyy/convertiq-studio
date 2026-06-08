@@ -15,6 +15,7 @@ import type {
   AudienceScoreRange,
 } from '@/lib/types';
 import { defaultDesign, defaultResultPageContent } from '@/lib/types';
+import { getResultTemplate } from '@/lib/resultTemplates';
 import {
   appendChild,
   deleteNode,
@@ -77,6 +78,9 @@ interface QuestionnaireState {
   reorderBranches: (questionId: string, fromIndex: number, toIndex: number) => void;
   updateScoringRule: (questionId: string, updates: Partial<ScoringRule>) => void;
   addResultPage: () => void;
+  /** Append a result page seeded from a global template (id from
+   *  `RESULT_TEMPLATES`). No-op if the id is unknown. */
+  addResultPageFromTemplate: (templateId: string) => void;
   updateResultPage: (id: string, updates: Partial<ResultPage>) => void;
   removeResultPage: (id: string) => void;
   /** Mutate a single node in the page's content tree. */
@@ -340,6 +344,27 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
           max_score: 10,
           sort_order: pages.length,
           content: defaultResultPageContent(),
+        },
+      ],
+      isDirty: true,
+    });
+  },
+
+  addResultPageFromTemplate: (templateId) => {
+    const tpl = getResultTemplate(templateId);
+    if (!tpl) return;
+    const pages = get().resultPages;
+    set({
+      resultPages: [
+        ...pages,
+        {
+          id: crypto.randomUUID(),
+          questionnaire_id: get().questionnaire?.id || '',
+          name: tpl.pageName,
+          min_score: 0,
+          max_score: 10,
+          sort_order: pages.length,
+          content: tpl.build(),
         },
       ],
       isDirty: true,
