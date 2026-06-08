@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { AnswersMap, Audience, Question, ScoringRule } from '@/lib/types';
+import type { AnswersMap, Audience, Question, QuestionBranch, ScoringRule } from '@/lib/types';
 import { assignAudience, countRedFlags } from '@/lib/audiences/assign';
+import { resolveBranchAudience } from '@/lib/audiences/branchFlow';
 import { calculateTotalScore } from '@/lib/scoring';
 
 /**
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
     admin
       .from('questions')
       .select('id, type, title, required, sort_order, options, validation, questionnaire_id')
-      .eq('questionnaire_id', questionnaireId),
+      .eq('questionnaire_id', questionnaireId)
+      .order('sort_order'),
     admin
       .from('questionnaire_audiences')
       .select('*, questionnaire_audience_score_ranges(*)')
@@ -75,6 +77,14 @@ export async function POST(request: Request) {
         .in('question_id', questionIds)
     : { data: [] as ScoringRule[] };
   const scoringRules = (scoringRulesData ?? []) as ScoringRule[];
+
+  // Branches are needed to replay mid-flow audience assignment so a recompute
+  // (fired after every editor save) doesn't clobber a branch-assigned audience
+  // back to the score-range result.
+  const { data: branchesData } = questionIds.length > 0
+    ? await admin.from('question_branches').select('*').in('question_id', questionIds)
+    : { data: [] as QuestionBranch[] };
+  const branches = (branchesData ?? []) as QuestionBranch[];
 
   type AudienceRow = {
     id: string;
@@ -133,12 +143,14 @@ export async function POST(request: Request) {
     const answers = answersByResponse.get(r.id) ?? {};
     const nextTotalScore = calculateTotalScore(questions, scoringRules, answers);
     const redFlagCount = countRedFlags(questions, answers);
+    const branchAudienceId = resolveBranchAudience(questions, branches, answers);
     const nextAudienceId = assignAudience({
       totalScore: nextTotalScore,
       redFlagCount,
       redFlagThreshold: questionnaire.red_flag_threshold ?? null,
       redFlagAudienceId: questionnaire.red_flag_audience_id ?? null,
       audiences,
+      branchAudienceId,
     });
 
     const scoreChanged = nextTotalScore !== r.total_score;

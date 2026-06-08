@@ -6,6 +6,11 @@ export interface AssignAudienceArgs {
   redFlagThreshold: number | null;
   redFlagAudienceId: string | null;
   audiences: Audience[];
+  /** Audience tagged by a matching branch mid-flow (see branchFlow.ts).
+   *  When set and it resolves to an existing audience, it wins over the
+   *  red-flag and score-range rules — an explicit author decision beats the
+   *  post-hoc score heuristic. Null/omitted → fall back to the rules below. */
+  branchAudienceId?: string | null;
 }
 
 /**
@@ -13,10 +18,12 @@ export interface AssignAudienceArgs {
  * always yield the same id. Returns null when no rule matches.
  *
  * Precedence:
- *   1. Red-flag rule wins. If `redFlagThreshold` is set and
+ *   1. Branch assignment wins. If `branchAudienceId` resolves to an existing
+ *      audience, return it.
+ *   2. Red-flag rule. If `redFlagThreshold` is set and
  *      `redFlagCount >= threshold` and `redFlagAudienceId` resolves to an
  *      existing audience, return that.
- *   2. Otherwise, walk audiences in `sort_order`, then each audience's
+ *   3. Otherwise, walk audiences in `sort_order`, then each audience's
  *      ranges in `sort_order`. The first range whose inclusive
  *      [min_score, max_score] contains `totalScore` wins. Null bounds are
  *      treated as unbounded on that side.
@@ -27,7 +34,12 @@ export function assignAudience({
   redFlagThreshold,
   redFlagAudienceId,
   audiences,
+  branchAudienceId,
 }: AssignAudienceArgs): string | null {
+  if (branchAudienceId && audiences.some((a) => a.id === branchAudienceId)) {
+    return branchAudienceId;
+  }
+
   if (
     redFlagThreshold != null &&
     redFlagThreshold > 0 &&

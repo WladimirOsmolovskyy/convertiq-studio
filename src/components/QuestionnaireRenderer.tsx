@@ -29,7 +29,6 @@ import { nanoid } from 'nanoid';
 import type {
   AnswersMap,
   Audience,
-  BranchCondition,
   BrandPalette,
   DesignConfig,
   ElementId,
@@ -44,6 +43,7 @@ import { resolveDesign } from '@/lib/designResolve';
 import { isCustomField, resolveLeadFields } from '@/lib/leadFields';
 import { buildLeadPayload } from '@/lib/leadPayload';
 import { assignAudience, countRedFlags } from '@/lib/audiences/assign';
+import { nextStep, resolveBranchAudience } from '@/lib/audiences/branchFlow';
 import { calculateTotalScore } from '@/lib/scoring';
 import ResultPageRenderer from '@/components/ResultPageRenderer';
 import { projectAnswers, type ResultRenderContext } from '@/lib/resultVariables';
@@ -85,63 +85,6 @@ export interface QuestionnaireRendererProps {
 }
 
 const hasOptions = (type: string) => ['radio', 'checkbox', 'dropdown'].includes(type);
-
-/**
- * Evaluate a single branch condition against a visitor's answer.
- *
- * The only place branch conditions are interpreted at runtime — shared by the
- * public flow and the editor preview. `condition.field` discriminates how
- * `condition.value` is matched:
- *   - 'option' → value is an option id, tested against `ans.selected_options`
- *   - 'value'  → value is a literal, tested against the free-text `ans.value`
- *
- * An empty `condition.value` never matches, so an incompletely-authored branch
- * (e.g. a freshly-added one) is inert rather than silently routing. `greater_than`
- * / `less_than` are numeric (NaN operands never match) and are meaningless for
- * option ids, so they return false there.
- */
-function branchMatches(
-  condition: BranchCondition,
-  ans: { value?: string; selected_options?: string[] } | undefined,
-): boolean {
-  const { field, operator, value } = condition;
-  if (value === '') return false;
-
-  if (field === 'option') {
-    const selected = ans?.selected_options ?? [];
-    switch (operator) {
-      case 'equals':
-      case 'contains':
-        return selected.includes(value);
-      case 'not_equals':
-        return !selected.includes(value);
-      default:
-        return false;
-    }
-  }
-
-  const raw = ans?.value ?? '';
-  switch (operator) {
-    case 'equals':
-      return raw === value;
-    case 'not_equals':
-      return raw !== value;
-    case 'contains':
-      return raw.includes(value);
-    case 'greater_than': {
-      const a = Number(raw);
-      const b = Number(value);
-      return Number.isFinite(a) && Number.isFinite(b) && a > b;
-    }
-    case 'less_than': {
-      const a = Number(raw);
-      const b = Number(value);
-      return Number.isFinite(a) && Number.isFinite(b) && a < b;
-    }
-    default:
-      return false;
-  }
-}
 
 /** Convert sparse `design.elements[id]` overrides into inline CSS. Only the
  *  fields wired in Commit C are emitted (fill, radius, padding); VarRefs are
@@ -271,23 +214,7 @@ export default function QuestionnaireRenderer({
   };
 
   const getNextQuestionIndex = useCallback(
-    (qIndex: number, answer: AnswersMap) => {
-      const q = questions[qIndex];
-      const qBranches = branches
-        .filter((b) => b.question_id === q.id)
-        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-
-      const ans = answer[q.id];
-      for (const branch of qBranches) {
-        if (!branchMatches(branch.condition, ans)) continue;
-        if (branch.is_end) return -1;
-        if (branch.target_question_id) {
-          const targetIdx = questions.findIndex((tq) => tq.id === branch.target_question_id);
-          if (targetIdx >= 0) return targetIdx;
-        }
-      }
-      return qIndex + 1 < questions.length ? qIndex + 1 : -1;
-    },
+    (qIndex: number, answer: AnswersMap) => nextStep(questions, branches, qIndex, answer).nextIdx,
     [questions, branches],
   );
 
@@ -396,12 +323,14 @@ export default function QuestionnaireRenderer({
 
     const redFlagCount = countRedFlags(questions, finalAnswers);
     const audienceList = audiences ?? [];
+    const branchAudienceId = resolveBranchAudience(questions, branches, finalAnswers);
     const audienceId = assignAudience({
       totalScore: score,
       redFlagCount,
       redFlagThreshold: questionnaire.red_flag_threshold ?? null,
       redFlagAudienceId: questionnaire.red_flag_audience_id ?? null,
       audiences: audienceList,
+      branchAudienceId,
     });
     const matchedAudience = audienceId
       ? audienceList.find((a) => a.id === audienceId) ?? null
