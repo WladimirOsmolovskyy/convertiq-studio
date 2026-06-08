@@ -290,7 +290,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
       q && (q.type === 'radio' || q.type === 'checkbox' || q.type === 'dropdown') ? 'option' : 'value';
     const sortOrder = get().branches.filter((b) => b.question_id === qId).length;
     set({
-      branches: [...get().branches, { id: crypto.randomUUID(), question_id: qId, condition: { field, operator: 'equals', value: '' }, target_question_id: null, is_end: false, sort_order: sortOrder }],
+      branches: [...get().branches, { id: crypto.randomUUID(), question_id: qId, condition: { field, operator: 'equals', value: '' }, target_question_id: null, is_end: false, sort_order: sortOrder, assign_audience_id: null }],
       isDirty: true,
     });
   },
@@ -502,6 +502,9 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
       audiences: get().audiences.filter((a) => a.id !== id).map((a, i) => ({ ...a, sort_order: i })),
       questionnaire:
         q && q.red_flag_audience_id === id ? { ...q, red_flag_audience_id: null } : q,
+      branches: get().branches.map((b) =>
+        b.assign_audience_id === id ? { ...b, assign_audience_id: null } : b,
+      ),
       isDirty: true,
     });
   },
@@ -676,6 +679,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
             target_question_id: b.target_question_id,
             is_end: b.is_end,
             sort_order: b.sort_order ?? 0,
+            assign_audience_id: b.assign_audience_id ?? null,
           })),
         );
         if (bInsErr) console.error('Insert branches failed:', bInsErr);

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import type { BranchOperator, Question, QuestionBranch, QuestionType } from '@/lib/types';
 import {
@@ -59,8 +60,41 @@ const trunc = (s: string, n = 30) => (s.length > n ? `${s.slice(0, n)}…` : s);
 const scrollToCard = (id: string) =>
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
+/** Questions involved in one audience's routing: questions whose branch tags
+ *  this audience, plus everything reachable from them by following branch jump
+ *  targets. Editor-only — used to filter the view, never the runtime flow. */
+function questionsForAudience(audienceId: string, branches: QuestionBranch[]): Set<string> {
+  const set = new Set<string>();
+  const queue: string[] = [];
+  for (const b of branches) {
+    if (b.assign_audience_id === audienceId) {
+      queue.push(b.question_id);
+      if (b.target_question_id) queue.push(b.target_question_id);
+    }
+  }
+  while (queue.length) {
+    const id = queue.shift() as string;
+    if (set.has(id)) continue;
+    set.add(id);
+    for (const b of branches) {
+      if (b.question_id === id && b.target_question_id && !set.has(b.target_question_id)) {
+        queue.push(b.target_question_id);
+      }
+    }
+  }
+  return set;
+}
+
 export default function LogicEditor() {
-  const { questions, branches } = useQuestionnaireStore();
+  const { questions, branches, audiences } = useQuestionnaireStore();
+  const [activeAudience, setActiveAudience] = useState<string | null>(null);
+
+  // Editor-only view filter. Selecting an audience focuses the map + cards on
+  // that audience's routing; it never affects what a respondent sees.
+  const filterSet =
+    activeAudience && audiences.some((a) => a.id === activeAudience)
+      ? questionsForAudience(activeAudience, branches)
+      : null;
 
   return (
     <div className={styles.editorPanel}>
@@ -82,14 +116,54 @@ export default function LogicEditor() {
           </div>
         ) : (
           <>
-            <FlowMap questions={questions} branches={branches} />
-
-            {questions.map((q, idx) => (
-              <div key={q.id}>
-                <QuestionFlowCard q={q} idx={idx} />
-                {idx < questions.length - 1 && <div className={styles.flowConnector} />}
+            {audiences.length > 0 && (
+              <div className={styles.logicTabs} role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeAudience === null}
+                  className={`${styles.logicTab} ${activeAudience === null ? styles.logicTabActive : ''}`}
+                  onClick={() => setActiveAudience(null)}
+                >
+                  All branches
+                </button>
+                {audiences.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeAudience === a.id}
+                    className={`${styles.logicTab} ${activeAudience === a.id ? styles.logicTabActive : ''}`}
+                    onClick={() => setActiveAudience(a.id)}
+                  >
+                    <span
+                      className={styles.logicTabDot}
+                      style={{ background: a.color ?? 'var(--accent)' }}
+                      aria-hidden
+                    />
+                    {a.name}
+                  </button>
+                ))}
               </div>
-            ))}
+            )}
+
+            <FlowMap questions={questions} branches={branches} highlightIds={filterSet} />
+
+            {questions.map((q, idx) => {
+              if (filterSet && !filterSet.has(q.id)) return null;
+              return (
+                <div key={q.id}>
+                  <QuestionFlowCard q={q} idx={idx} />
+                  {idx < questions.length - 1 && <div className={styles.flowConnector} />}
+                </div>
+              );
+            })}
+
+            {filterSet && filterSet.size === 0 && (
+              <div className={styles.flowEmptyState}>
+                <p>No branch tags this audience yet. Add a branch and set “tag as” to route respondents here.</p>
+              </div>
+            )}
 
             <div className={styles.flowConnector} />
             <div id="logic-end" className={styles.flowTerminal}>
@@ -117,14 +191,29 @@ const NODE_Y = 96;
 const STEP = 132;
 const MAP_H = 150;
 
-function FlowMap({ questions, branches }: { questions: Question[]; branches: QuestionBranch[] }) {
+function FlowMap({
+  questions,
+  branches,
+  highlightIds,
+}: {
+  questions: Question[];
+  branches: QuestionBranch[];
+  highlightIds: Set<string> | null;
+}) {
   const nodes = [
-    ...questions.map((q, i) => ({ id: `logic-q-${q.id}`, label: `Q${i + 1}`, title: q.title })),
-    { id: 'logic-end', label: 'End', title: 'Results / End' },
+    ...questions.map((q, i) => ({ id: `logic-q-${q.id}`, qid: q.id as string | null, label: `Q${i + 1}`, title: q.title })),
+    { id: 'logic-end', qid: null as string | null, label: 'End', title: 'Results / End' },
   ];
   const endIdx = nodes.length - 1;
   const cx = (i: number) => i * STEP + NODE_W / 2;
   const width = nodes.length * STEP - (STEP - NODE_W);
+
+  // When a tab filter is active, dim everything not in the audience's subgraph.
+  const isDim = (idx: number) => {
+    if (!highlightIds) return false;
+    const n = nodes[idx];
+    return n.qid != null && !highlightIds.has(n.qid);
+  };
 
   const jumps = branches
     .map((b) => {
@@ -160,6 +249,7 @@ function FlowMap({ questions, branches }: { questions: Question[]; branches: Que
             x2={(i + 1) * STEP}
             y2={NODE_Y + NODE_H / 2}
             className={styles.flowMapDefaultEdge}
+            style={highlightIds && (isDim(i) || isDim(i + 1)) ? { opacity: 0.15 } : undefined}
           />
         ))}
 
@@ -170,6 +260,7 @@ function FlowMap({ questions, branches }: { questions: Question[]; branches: Que
           const arcH = Math.min(82, 26 + Math.abs(j.to - j.from) * 14);
           const midX = (x1 + x2) / 2;
           const d = `M ${x1} ${NODE_Y} Q ${midX} ${NODE_Y - arcH} ${x2} ${NODE_Y}`;
+          const dim = highlightIds && isDim(j.from) && isDim(j.to);
           return (
             <path
               key={`jmp-${i}`}
@@ -177,6 +268,7 @@ function FlowMap({ questions, branches }: { questions: Question[]; branches: Que
               fill="none"
               className={j.kind === 'end' ? styles.flowMapEndEdge : styles.flowMapJumpEdge}
               markerEnd={j.kind === 'end' ? 'url(#fm-arrow-end)' : 'url(#fm-arrow-jump)'}
+              style={dim ? { opacity: 0.15 } : undefined}
             />
           );
         })}
@@ -192,6 +284,7 @@ function FlowMap({ questions, branches }: { questions: Question[]; branches: Que
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') scrollToCard(n.id);
             }}
+            style={isDim(i) ? { opacity: 0.25 } : undefined}
           >
             <title>{n.title}</title>
             <rect
@@ -296,7 +389,7 @@ function BranchRow({
   q: Question;
   dragHandle: Pick<ReturnType<typeof useSortable>, 'attributes' | 'listeners'>;
 }) {
-  const { questions, updateBranch, removeBranch } = useQuestionnaireStore();
+  const { questions, audiences, updateBranch, removeBranch } = useQuestionnaireStore();
   const isChoice = hasOptions(q.type);
   const operators = operatorOptions(q.type);
   const incomplete = branch.condition.value === '';
@@ -386,6 +479,22 @@ function BranchRow({
           ))}
         <option value="__end__">End questionnaire</option>
       </select>
+
+      {audiences.length > 0 && (
+        <select
+          className={styles.branchSelect}
+          value={branch.assign_audience_id ?? ''}
+          onChange={(e) => updateBranch(branch.id, { assign_audience_id: e.target.value || null })}
+          title="Tag the visitor with an audience when this branch matches"
+        >
+          <option value="">— no tag —</option>
+          {audiences.map((a) => (
+            <option key={a.id} value={a.id}>
+              tag: {a.name}
+            </option>
+          ))}
+        </select>
+      )}
 
       {incomplete && (
         <span className={styles.branchInvalid} title="Incomplete — this branch won't fire">

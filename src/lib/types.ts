@@ -62,6 +62,12 @@ export interface QuestionBranch {
   /** Per-question evaluation order (first match wins). Branches are sorted by
    *  this before evaluation; absent → falls back to insertion order. */
   sort_order?: number;
+  /** When this branch matches, tag the visitor with this audience (mid-flow).
+   *  Sticky, last-write-wins across the run; overrides score-range/red-flag
+   *  assignment at submit. Null → this branch assigns no audience. Orthogonal
+   *  to target_question_id/is_end: a branch can assign-and-jump, assign-and-end,
+   *  or assign-and-fall-through. */
+  assign_audience_id?: string | null;
 }
 
 /* ─── Scoring ───────────────────────────────────────────────────── */
