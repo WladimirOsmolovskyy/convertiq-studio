@@ -922,7 +922,7 @@ export default function QuestionnaireRenderer({
             return (
               <div className={styles.resultsPage}>
                 {matchedPage ? (
-                  <ResultPageRenderer page={matchedPage} ctx={resultCtx} design={d} />
+                  <ResultPageRenderer page={matchedPage} ctx={resultCtx} design={d} brand={brand} />
                 ) : (
                   /* No score range matched — minimal fallback. */
                   <>

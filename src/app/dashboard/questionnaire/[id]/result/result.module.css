@@ -642,7 +642,9 @@
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  z-index: 11;
+  /* Rendered via a portal above a full-screen click-away overlay (z-index
+     1000); must sit above it so item clicks land instead of closing. */
+  z-index: 1001;
   background: var(--surface);
   border: 1px solid var(--separator);
   border-radius: var(--radius-md);
@@ -1225,4 +1227,219 @@
   color: var(--text-secondary);
   font-size: 0.8125rem;
   text-align: center;
+}
+
+/* ─── Bindable color (literal ⇄ Brand token) ───────────────────── */
+.bindColor {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+.bindColor .colorField {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.bindColorChip {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.bindColorChip:hover {
+  border-color: var(--accent);
+}
+.bindColorChipLabel {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bindColorBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.bindColorBtn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ─── Brand-token picker menu ──────────────────────────────────── */
+.brandTokenMenu {
+  z-index: 1001;
+  width: 220px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.brandTokenGroup + .brandTokenGroup {
+  margin-top: 4px;
+}
+.brandTokenGroupTitle {
+  padding: 4px 8px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.brandTokenItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+.brandTokenItem:hover {
+  background: var(--fill-quaternary);
+}
+.brandTokenItemActive {
+  background: var(--fill-quaternary);
+  font-weight: 600;
+}
+.brandTokenItemLabel {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Template gallery modal ───────────────────────────────────── */
+.galleryOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.4);
+}
+.galleryModal {
+  display: flex;
+  flex-direction: column;
+  width: min(880px, 100%);
+  max-height: min(680px, 90vh);
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-lg, 0 12px 48px rgba(0, 0, 0, 0.25));
+  overflow: hidden;
+}
+.galleryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--separator);
+}
+.galleryTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.galleryClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.galleryClose:hover {
+  background: var(--fill-quaternary);
+  color: var(--text);
+}
+.galleryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 20px;
+  overflow-y: auto;
+}
+.galleryCard {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: var(--bg);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+}
+.galleryCard:hover {
+  border-color: var(--accent);
+}
+.galleryPreview {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--separator);
+}
+.galleryPreviewScale {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform-origin: top center;
+}
+.galleryBlankPreview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-muted);
+  background: var(--fill-quaternary);
+  border-bottom: 1px solid var(--separator);
+}
+.galleryCardMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+}
+.galleryCardName {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.galleryCardDesc {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-muted);
 }
