@@ -20,6 +20,7 @@
 import { RotateCcw, Link2 } from 'lucide-react';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import { resolveDesign } from '@/lib/designResolve';
+import { isValidHex, parseColor, buildColor } from '@/lib/color';
 import editorStyles from '../editor.module.css';
 import designStyles from './design.module.css';
 
@@ -53,7 +54,6 @@ function getFontDef(cssValue: string): FontDef {
   return FONTS.find(f => f.value === cssValue) || FONTS[0];
 }
 
-function isValidHex(c: string) { return /^#[0-9a-fA-F]{6}$/.test(c); }
 
 /* ── Safe typography accessors (size/weight/line-height/spacing) ── */
 function getBody(design: { typography: { body?: { size?: number; weight?: number; lineHeight?: number; letterSpacing?: number }; baseFontSize?: number; lineHeight?: number } }) {
@@ -86,18 +86,24 @@ function ColorField({
   onRestore?: () => void;
   inheritLabel?: string;
 }) {
-  const displayColor = isValidHex(value) ? value : '#000000';
+  const { rgb, alpha } = parseColor(value);
+  const swatchColor = isValidHex(value) ? value : '#000000';
   return (
-    <div className={editorStyles.colorField}>
-      <div className={editorStyles.colorSwatch} style={{ backgroundColor: displayColor }}>
-        <input type="color" value={displayColor} onChange={(e) => onChange(e.target.value)} />
+    <div className={designStyles.colorRow}>
+      <div className={editorStyles.colorSwatch} style={{ backgroundColor: swatchColor }}>
+        <input type="color" value={rgb} onChange={(e) => onChange(buildColor(e.target.value, alpha))} />
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.0625rem', minWidth: 0 }}>
-        <span className={editorStyles.colorLabel}>{label}</span>
-        <span style={{ fontSize: '0.5625rem', color: 'var(--text-muted)', fontFamily: "'SF Mono', monospace" }}>
-          {value.substring(0, 20)}
-        </span>
-      </div>
+      <span className={designStyles.colorRowLabel}>{label}</span>
+      <input
+        type="range"
+        className={designStyles.opacitySlider}
+        min={0}
+        max={100}
+        value={alpha}
+        onChange={(e) => onChange(buildColor(rgb, Number(e.target.value)))}
+        aria-label={`${label} opacity (%)`}
+      />
+      <span className={designStyles.opacityPct}>{alpha}%</span>
       {onRestore && (
         <span className={designStyles.colorFieldState}>
           {overridden ? (
@@ -288,7 +294,7 @@ export default function VariablesPanel() {
       {/* Colors */}
       <div className={editorStyles.designSection}>
         <SectionTitle>Colors</SectionTitle>
-        <div className={editorStyles.colorGrid}>
+        <div className={designStyles.colorList}>
           <ColorField label="Background" value={r.colors.background} overridden={design.colors.background !== undefined}
             onChange={(v) => handleColorChange('background', v)} onRestore={() => restoreColorVar('background')} />
           <ColorField label="Surface" value={r.colors.surface} overridden={design.colors.surface !== undefined}
