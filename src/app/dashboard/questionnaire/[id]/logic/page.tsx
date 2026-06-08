@@ -19,7 +19,9 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import {
   AlertTriangle,
+  Circle,
   CornerDownRight,
+  CornerLeftUp,
   Flag,
   GitBranch,
   GripVertical,
@@ -59,6 +61,41 @@ const trunc = (s: string, n = 30) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 const scrollToCard = (id: string) =>
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+/** Short human label for a branch's condition, e.g. is “Enterprise” or > 5.
+ *  Empty when the branch is incomplete. */
+function conditionLabel(branch: QuestionBranch, q: Question): string {
+  if (branch.condition.value === '') return '';
+  const opLabel =
+    operatorOptions(q.type).find((o) => o.value === branch.condition.operator)?.label ??
+    branch.condition.operator;
+  if (branch.condition.field === 'option') {
+    const opt = q.options.find((o) => o.id === branch.condition.value);
+    return `${opLabel} “${trunc(opt?.label ?? branch.condition.value, 18)}”`;
+  }
+  return `${opLabel} ${trunc(branch.condition.value, 18)}`;
+}
+
+type ExitKind = 'forward' | 'back' | 'end' | 'broken' | 'default';
+
+/** Resolve where a branch leads, classified for the vertical exit tree.
+ *  Pure: derived from arrays already in scope, no store writes. */
+function resolveExit(
+  branch: QuestionBranch,
+  questions: Question[],
+  fromIdx: number,
+): { kind: ExitKind; label: string; scrollId: string | null } {
+  if (branch.is_end) return { kind: 'end', label: 'End', scrollId: 'logic-end' };
+  if (!branch.target_question_id) return { kind: 'default', label: 'Next question', scrollId: null };
+  const to = questions.findIndex((t) => t.id === branch.target_question_id);
+  if (to < 0) return { kind: 'broken', label: 'Missing target', scrollId: null };
+  const label = `Q${to + 1}: ${trunc(questions[to].title, 24)}`;
+  return {
+    kind: to > fromIdx ? 'forward' : 'back',
+    label,
+    scrollId: `logic-q-${branch.target_question_id}`,
+  };
+}
 
 /** Questions involved in one audience's routing: questions whose branch tags
  *  this audience, plus everything reachable from them by following branch jump
@@ -147,7 +184,10 @@ export default function LogicEditor() {
               </div>
             )}
 
-            <FlowMap questions={questions} branches={branches} highlightIds={filterSet} />
+            <details className={styles.flowOverview}>
+              <summary className={styles.flowOverviewSummary}>Overview map</summary>
+              <FlowMap questions={questions} branches={branches} highlightIds={filterSet} />
+            </details>
 
             {questions.map((q, idx) => {
               if (filterSet && !filterSet.has(q.id)) return null;
@@ -325,7 +365,7 @@ function QuestionFlowCard({ q, idx }: { q: Question; idx: number }) {
   };
 
   const nextQ = idx < questions.length - 1 ? questions[idx + 1] : null;
-  const defaultLabel = nextQ ? `Q${idx + 2}: ${trunc(nextQ.title)}` : 'End (results)';
+  const pathsIn = branches.filter((b) => b.target_question_id === q.id).length;
 
   return (
     <div id={`logic-q-${q.id}`} className={styles.flowQuestionNode}>
@@ -338,6 +378,7 @@ function QuestionFlowCard({ q, idx }: { q: Question; idx: number }) {
             {q.required && ' • required'}
           </div>
         </div>
+        {pathsIn > 1 && <span className={styles.pathsInBadge}>{pathsIn} paths in</span>}
         <button className="btn btn-ghost btn-sm" onClick={() => addBranch(q.id)}>
           <Plus size={12} strokeWidth={2.25} /> Add branch
         </button>
@@ -355,9 +396,82 @@ function QuestionFlowCard({ q, idx }: { q: Question; idx: number }) {
         </DndContext>
       )}
 
-      <div className={styles.branchDefault}>
-        <CornerDownRight size={13} strokeWidth={1.75} aria-hidden /> Otherwise → {defaultLabel}
+      {/* Vertical exit tree — read-only visualization of where each branch leads */}
+      <div className={styles.branchTree}>
+        {qBranches.map((branch) => {
+          const cond = conditionLabel(branch, q);
+          const exit = resolveExit(branch, questions, idx);
+          return (
+            <ExitItem
+              key={branch.id}
+              cond={cond ? `if ${cond}` : 'incomplete'}
+              kind={exit.kind}
+              label={exit.label}
+              scrollId={exit.scrollId}
+            />
+          );
+        })}
+        <ExitItem
+          cond="otherwise"
+          kind={nextQ ? 'forward' : 'end'}
+          label={nextQ ? `Q${idx + 2}: ${trunc(nextQ.title, 24)}` : 'End (results)'}
+          scrollId={nextQ ? `logic-q-${nextQ.id}` : 'logic-end'}
+          muted
+        />
       </div>
+    </div>
+  );
+}
+
+/* ─── Exit-tree item (read-only) ─────────────────────────────────── */
+
+function ExitItem({
+  cond,
+  kind,
+  label,
+  scrollId,
+  muted,
+}: {
+  cond: string;
+  kind: ExitKind;
+  label: string;
+  scrollId: string | null;
+  muted?: boolean;
+}) {
+  const icon =
+    kind === 'end' ? <Flag size={12} strokeWidth={2} aria-hidden /> :
+    kind === 'back' ? <CornerLeftUp size={12} strokeWidth={2} aria-hidden /> :
+    kind === 'broken' ? <AlertTriangle size={12} strokeWidth={2} aria-hidden /> :
+    kind === 'forward' ? <Circle size={9} strokeWidth={3} aria-hidden /> :
+    null;
+  const tone = muted
+    ? styles.chipMuted
+    : kind === 'end'
+      ? styles.chipEnd
+      : kind === 'back'
+        ? styles.chipBack
+        : kind === 'broken'
+          ? styles.chipBroken
+          : kind === 'forward'
+            ? styles.chipForward
+            : styles.chipMuted;
+  const chipBody = (
+    <>
+      {icon}
+      {label}
+    </>
+  );
+  return (
+    <div className={styles.branchTreeItem}>
+      <span className={styles.branchTreeCond}>{cond}</span>
+      <CornerDownRight size={12} strokeWidth={1.75} className={styles.branchTreeArrow} aria-hidden />
+      {scrollId ? (
+        <button type="button" className={`${styles.branchChip} ${tone}`} onClick={() => scrollToCard(scrollId)}>
+          {chipBody}
+        </button>
+      ) : (
+        <span className={`${styles.branchChip} ${tone}`}>{chipBody}</span>
+      )}
     </div>
   );
 }
