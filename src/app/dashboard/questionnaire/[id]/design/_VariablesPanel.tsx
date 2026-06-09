@@ -252,7 +252,7 @@ function FontPanel({
 
 /* ── Main Component ────────────────────────────────────────────── */
 export default function VariablesPanel() {
-  const { design, brand, updateDesign } = useQuestionnaireStore();
+  const { design, brand, updateDesign, questions } = useQuestionnaireStore();
   // Resolved view for DISPLAY — fields the questionnaire doesn't override
   // show their inherited Brand value. Writes still set sparse overrides.
   const r = resolveDesign(design, brand);
@@ -359,6 +359,7 @@ export default function VariablesPanel() {
       <div className={editorStyles.designSection}>
         <SectionTitle>Behavior</SectionTitle>
         <SliderField label="Auto-advance delay" value={design.behavior?.selectFeedbackMs ?? SELECT_FEEDBACK_MS} onChange={(v) => updateDesign({ behavior: { ...design.behavior, selectFeedbackMs: v } })} min={0} max={800} step={20} unit="ms" />
+        <SliderField label="Show progress from Q" value={design.behavior?.progressStartQuestion ?? 1} onChange={(v) => updateDesign({ behavior: { ...design.behavior, progressStartQuestion: v } })} min={1} max={Math.max(1, questions.length)} step={1} />
       </div>
 
       {/* Page background */}

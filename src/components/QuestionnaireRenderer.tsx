@@ -517,8 +517,9 @@ export default function QuestionnaireRenderer({
       >
         {!completed ? (
           <>
-            {/* Progress */}
-            {(() => {
+            {/* Progress — gated by `progressStartQuestion` on the live page;
+                always shown on the editable canvas so it stays selectable. */}
+            {(selectableMode || currentIndex + 1 >= (d.behavior?.progressStartQuestion ?? 1)) && (() => {
               const sel = interact('progress');
               return (
                 <div

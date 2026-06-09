@@ -394,6 +394,9 @@ export interface DesignConfig {
     /** Pause (ms) on a picked answer before a single-choice question
      *  auto-advances — a brief selection confirmation. */
     selectFeedbackMs?: number;
+    /** 1-based question number from which the progress bar becomes visible
+     *  (default 1 = always shown). */
+    progressStartQuestion?: number;
   };
 }
 
