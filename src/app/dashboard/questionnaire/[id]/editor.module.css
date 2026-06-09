@@ -574,6 +574,7 @@
 }
 .graphCanvas {
   position: relative;
+  margin: 0 auto;
 }
 .graphEdges {
   position: absolute;
@@ -592,6 +593,20 @@
 }
 .graphNode:hover {
   border-color: var(--accent);
+}
+.graphNodeGrab {
+  cursor: grab;
+}
+.graphNodeDragging {
+  z-index: 5;
+  box-shadow: var(--shadow-md);
+  cursor: grabbing;
+}
+.graphNodeDragging .graphNodeGrab {
+  cursor: grabbing;
+}
+.graphNodeShift {
+  transition: left var(--duration-fast) var(--ease-out);
 }
 .graphNodeHead {
   display: flex;
