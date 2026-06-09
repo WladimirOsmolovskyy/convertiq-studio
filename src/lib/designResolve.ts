@@ -120,6 +120,9 @@ function deriveComponents(
   const primary = colors.primary;
   const surface = colors.surface;
   const surfaceHighlight = colors.surfaceHighlight;
+  // Questionnaire 'secondary' inherits the Brand accent token — used as the
+  // default progress fill so the filled portion stands out.
+  const accent = colors.secondary;
   const light = isLight(isValidHex(bg) ? bg : '#ffffff');
   // Color fields derive straight from the resolved Brand colors — stored
   // component colors (a deprecated layer cached by an older editor) are
@@ -151,7 +154,7 @@ function deriveComponents(
     },
     progress: {
       background: light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
-      fillColor: primary,
+      fillColor: accent,
       height: s.progress?.height ?? 4,
     },
     input: {
