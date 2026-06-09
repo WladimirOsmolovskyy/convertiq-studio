@@ -39,6 +39,7 @@ import type {
   ResultPage,
   ScoringRule,
 } from '@/lib/types';
+import { SELECT_FEEDBACK_MS } from '@/lib/types';
 import { resolveDesign } from '@/lib/designResolve';
 import { isCustomField, resolveLeadFields } from '@/lib/leadFields';
 import { buildLeadPayload } from '@/lib/leadPayload';
@@ -85,10 +86,6 @@ export interface QuestionnaireRendererProps {
 }
 
 const hasOptions = (type: string) => ['radio', 'checkbox', 'dropdown'].includes(type);
-
-/** Brief pause after picking a radio answer so the selection highlight is
- *  visible before the question auto-advances — a small confirmation beat. */
-const SELECT_FEEDBACK_MS = 220;
 
 /** Convert sparse `design.elements[id]` overrides into inline CSS. Only the
  *  fields wired in Commit C are emitted (fill, radius, padding); VarRefs are
@@ -248,7 +245,9 @@ export default function QuestionnaireRenderer({
 
     // Hold on the highlighted selection briefly so the user sees their
     // choice register before the question auto-advances.
-    await new Promise((resolve) => setTimeout(resolve, SELECT_FEEDBACK_MS));
+    await new Promise((resolve) =>
+      setTimeout(resolve, d.behavior?.selectFeedbackMs ?? SELECT_FEEDBACK_MS),
+    );
 
     const nextIdx = getNextQuestionIndex(currentIndex, newAnswers);
     const reachedEnd = nextIdx === -1 || nextIdx >= questions.length;

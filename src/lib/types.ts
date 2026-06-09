@@ -388,6 +388,12 @@ export interface DesignConfig {
    * inspector UI shell compiles; renderer applies them only when present.
    */
   elements?: Partial<Record<ElementId, ElementStyles>>;
+  /** Respondent-facing interaction behavior for the published questionnaire. */
+  behavior?: {
+    /** Pause (ms) on a picked answer before a single-choice question
+     *  auto-advances — a brief selection confirmation. */
+    selectFeedbackMs?: number;
+  };
 }
 
 /**
@@ -504,6 +510,10 @@ export const defaultDesign: DesignConfig = {
     value: '#f5f5f7',
   },
 };
+
+/** Default pause (ms) on a picked answer before a single-choice question
+ *  auto-advances. Overridable per questionnaire via `design.behavior`. */
+export const SELECT_FEEDBACK_MS = 220;
 
 /* ─── Project ───────────────────────────────────────────────────── */
 

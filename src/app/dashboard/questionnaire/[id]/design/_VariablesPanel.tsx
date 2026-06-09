@@ -11,6 +11,7 @@
  *   Typography  — Heading / Body: font · weight · size · line-height · spacing
  *   Layout      — content width · radius · card padding · question spacing
  *   Background  — page background mode (solid uses the Background color)
+ *   Behavior    — auto-advance delay after picking a single-choice answer
  *
  * Per-element styling (button, progress, options, inputs, card) lives in the
  * Inspector tab — select the element on the canvas. This panel intentionally
@@ -20,6 +21,7 @@
 import { RotateCcw, Link2 } from 'lucide-react';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import { resolveDesign } from '@/lib/designResolve';
+import { SELECT_FEEDBACK_MS } from '@/lib/types';
 import { isValidHex, parseColor, buildColor } from '@/lib/color';
 import editorStyles from '../editor.module.css';
 import designStyles from './design.module.css';
@@ -350,6 +352,12 @@ export default function VariablesPanel() {
         <SliderField label="Corner Radius" value={design.layout.borderRadius} onChange={(v) => updateDesign({ layout: { ...design.layout, borderRadius: v } })} min={0} max={30} unit="px" />
         <SliderField label="Card Padding" value={design.layout.padding} onChange={(v) => updateDesign({ layout: { ...design.layout, padding: v } })} min={0.5} max={4} step={0.25} unit="rem" />
         <SliderField label="Question Spacing" value={design.layout.questionSpacing} onChange={(v) => updateDesign({ layout: { ...design.layout, questionSpacing: v } })} min={0.5} max={4} step={0.25} unit="rem" />
+      </div>
+
+      {/* Behavior */}
+      <div className={editorStyles.designSection}>
+        <SectionTitle>Behavior</SectionTitle>
+        <SliderField label="Auto-advance delay" value={design.behavior?.selectFeedbackMs ?? SELECT_FEEDBACK_MS} onChange={(v) => updateDesign({ behavior: { ...design.behavior, selectFeedbackMs: v } })} min={0} max={800} step={20} unit="ms" />
       </div>
 
       {/* Page background */}

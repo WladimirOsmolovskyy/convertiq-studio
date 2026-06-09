@@ -181,6 +181,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
           input: { ...c.components.input, ...(partial.components?.input || {}) },
         },
         background: { ...c.background, ...(partial.background || {}) },
+        behavior: { ...(c.behavior || {}), ...(partial.behavior || {}) },
       },
       isDirty: true,
     });
