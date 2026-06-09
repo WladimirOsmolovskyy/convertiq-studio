@@ -17,13 +17,20 @@ You're working in a feature worktree (e.g. `~/Programming/convertiq-agent-N`). A
 1. **Read the brief.** It tells you scope, files to read, success criteria.
 2. **Plan.** Post the plan, wait for approval before writing code.
 3. **Implement.** Follow the workflow rules in [CLAUDE.md](./CLAUDE.md#workflow-rules).
-4. **Land it.** Run `land "<message>"` yourself (it's `git add -A && git commit`). One commit per coherent logical change — if your work has two distinct concerns, make two commits. Write the message per the rules below.
-5. **Report.** Post a short summary:
-   - The `land` message(s) you used.
-   - **New migrations?** File number + what the schema change does.
-   - **New env vars?** Names + what each is for. Confirm you added them to `.env.local.example`.
-   - **Next step**: *testable locally* / *needs migration (orchestrator runs `stage`)* / *needs env vars in Vercel*.
-   - Whether you're done or more is coming.
+4. **Decide whether to land — yourself. Never ask.** You make the call based on whether you actually changed code:
+   - **Land** when you made a real, code-level change worth recording (a feature, fix, refactor, migration, etc.). One commit per coherent change — two distinct concerns → two commits.
+   - **Do NOT land** when there was no net code change: you only chatted/answered questions, only read files, or you reverted/discarded work you never committed. Just reply normally with no `land`.
+5. **Report.** Short summary: new migrations (number + what), new env vars (names + purpose, confirm added to `.env.local.example`), next step (*testable locally* / *needs migration* / *needs env vars in Vercel*), and whether you're done or more is coming.
+
+### MUST: end with the exact `land` command
+
+When you land, the **final line of your reply is the literal `land` command(s) you ran** — verbatim, exactly as typed, nothing after it. The user copies/relies on that line. Example ending:
+
+```
+land "feat(logic): add operator dropdown to branch conditions"
+```
+
+If you made two commits, the last two lines are the two `land` commands. If you did **not** land (trivial / no code change), there is no `land` line at all — and you still never ask whether to land.
 
 ### Your land message IS the changelog
 
