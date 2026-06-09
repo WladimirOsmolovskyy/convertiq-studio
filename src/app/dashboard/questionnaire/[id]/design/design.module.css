@@ -330,12 +330,9 @@
   width: 22px;
   height: 22px;
   border-radius: 5px;
-  background: linear-gradient(45deg, #e0e0e0 25%, transparent 25%) -3px 0,
-              linear-gradient(-45deg, #e0e0e0 25%, transparent 25%) -3px 0,
-              linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
-              linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
-  background-size: 8px 8px;
   background-color: #fff;
+  background-image: conic-gradient(#e3e3e3 25%, transparent 0 50%, #e3e3e3 0 75%, transparent 0);
+  background-size: 5px 5px;
   border: 1px solid var(--border);
   flex-shrink: 0;
   overflow: hidden;
