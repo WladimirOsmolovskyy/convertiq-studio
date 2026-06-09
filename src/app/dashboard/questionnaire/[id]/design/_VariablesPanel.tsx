@@ -71,7 +71,7 @@ function getHeading(design: { typography: { heading?: { size?: number; weight?: 
     size: design.typography.heading?.size ?? Math.round((design.typography.baseFontSize ?? 16) * 1.375),
     weight: design.typography.heading?.weight ?? design.typography.headingWeight ?? 700,
     lineHeight: design.typography.heading?.lineHeight ?? 1.2,
-    letterSpacing: design.typography.heading?.letterSpacing ?? -0.02,
+    letterSpacing: design.typography.heading?.letterSpacing ?? -0.5,
   };
 }
 
@@ -261,7 +261,7 @@ function FontPanel({
 
       <SliderField label="Size" value={size} onChange={onSizeChange} min={sizeMin} max={sizeMax} unit="px" />
       <SliderField label="Line Height" value={lineHeight} onChange={onLineHeightChange} min={0.8} max={3} step={0.05} />
-      <SliderField label="Spacing" value={letterSpacing} onChange={onLetterSpacingChange} min={-0.1} max={0.3} step={0.005} unit="em" />
+      <SliderField label="Spacing" value={letterSpacing} onChange={onLetterSpacingChange} min={-2} max={10} step={0.5} unit="px" />
     </div>
   );
 }

@@ -320,14 +320,14 @@ export interface DesignConfig {
       size: number; // px
       weight: number;
       lineHeight: number;
-      letterSpacing: number; // em
+      letterSpacing: number; // px
       color: string;
     };
     heading: {
       size: number; // px
       weight: number;
       lineHeight: number;
-      letterSpacing: number; // em
+      letterSpacing: number; // px
       color: string;
     };
   };
@@ -498,7 +498,7 @@ export const defaultDesign: DesignConfig = {
       size: 22,
       weight: 700,
       lineHeight: 1.2,
-      letterSpacing: -0.02,
+      letterSpacing: -0.5,
       color: '#1d1d1f',
     },
   },

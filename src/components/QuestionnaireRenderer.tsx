@@ -492,7 +492,7 @@ export default function QuestionnaireRenderer({
         fontSize: `${d.typography.body?.size ?? d.typography.baseFontSize}px`,
         fontWeight: d.typography.body?.weight ?? 400,
         lineHeight: d.typography.body?.lineHeight ?? d.typography.lineHeight,
-        letterSpacing: `${d.typography.body?.letterSpacing ?? 0}em`,
+        letterSpacing: `${d.typography.body?.letterSpacing ?? 0}px`,
         ...elementOverrideStyle(d, 'page'),
       }}
     >
@@ -584,7 +584,7 @@ export default function QuestionnaireRenderer({
                     fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
                     fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
                     lineHeight: d.typography.heading?.lineHeight ?? 1.2,
-                    letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
+                    letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.5}px`,
                     color: d.colors.heading,
                     ...elementOverrideStyle(d, 'questionTitle'),
                   }}
@@ -691,7 +691,7 @@ export default function QuestionnaireRenderer({
                     fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
                     fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
                     lineHeight: d.typography.heading?.lineHeight ?? 1.2,
-                    letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
+                    letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.5}px`,
                     color: d.colors.heading,
                     ...elementOverrideStyle(d, 'questionTitle'),
                   }}
@@ -961,7 +961,7 @@ export default function QuestionnaireRenderer({
                       style={{
                         fontFamily: d.typography.headingFont,
                         fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
-                        letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
+                        letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.5}px`,
                         color: d.colors.heading,
                       }}
                     >
