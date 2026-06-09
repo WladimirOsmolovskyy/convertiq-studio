@@ -209,8 +209,8 @@ export default function QuestionnaireRenderer({
   // Identity for fully-populated configs (existing questionnaires); fills
   // gaps from brand (new questionnaires). All style reads below use `d`.
   const d = resolveDesign(design, brand);
-  // Back button shows only when both toggles allow it (default true).
-  const showBackBtn = (d.behavior?.showBackButton ?? true) && (d.behavior?.allowBack ?? true);
+  // Single toggle: show the Back button (and allow going back) — default true.
+  const showBackBtn = d.behavior?.showBackButton ?? true;
 
   const getBackgroundCSS = () => {
     if (d.background.type === 'gradient') return d.background.value;

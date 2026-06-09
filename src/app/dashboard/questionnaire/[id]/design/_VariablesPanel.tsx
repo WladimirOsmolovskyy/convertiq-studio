@@ -377,7 +377,6 @@ export default function VariablesPanel() {
         <SliderField label="Auto-advance delay" value={design.behavior?.selectFeedbackMs ?? SELECT_FEEDBACK_MS} onChange={(v) => updateDesign({ behavior: { ...design.behavior, selectFeedbackMs: v } })} min={0} max={800} step={20} unit="ms" />
         <SliderField label="Show progress from Q" value={design.behavior?.progressStartQuestion ?? 1} onChange={(v) => updateDesign({ behavior: { ...design.behavior, progressStartQuestion: v } })} min={1} max={Math.max(1, questions.length)} step={1} />
         <ToggleField label="Show back button" checked={design.behavior?.showBackButton ?? true} onChange={(v) => updateDesign({ behavior: { ...design.behavior, showBackButton: v } })} />
-        <ToggleField label="Allow going back" checked={design.behavior?.allowBack ?? true} onChange={(v) => updateDesign({ behavior: { ...design.behavior, allowBack: v } })} />
         <div className={editorStyles.sliderRow}>
           <span className={editorStyles.sliderLabel}>Progress label</span>
           <div style={{ display: 'flex', gap: '0.375rem' }}>
