@@ -566,7 +566,7 @@ export default function QuestionnaireRenderer({
                     fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
                     lineHeight: d.typography.heading?.lineHeight ?? 1.2,
                     letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
-                    color: d.colors.text,
+                    color: d.colors.heading,
                     ...elementOverrideStyle(d, 'questionTitle'),
                   }}
                 >
@@ -673,7 +673,7 @@ export default function QuestionnaireRenderer({
                     fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
                     lineHeight: d.typography.heading?.lineHeight ?? 1.2,
                     letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
-                    color: d.colors.text,
+                    color: d.colors.heading,
                     ...elementOverrideStyle(d, 'questionTitle'),
                   }}
                 >
@@ -932,7 +932,7 @@ export default function QuestionnaireRenderer({
                         fontFamily: d.typography.headingFont,
                         fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
                         letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
-                        color: d.colors.text,
+                        color: d.colors.heading,
                       }}
                     >
                       Thank you!
