@@ -26,6 +26,7 @@ const OPT_CELL_W = 66;
 const HEADER_H = 34;
 const OPT_STRIP_H = 30;
 const NODE_H = HEADER_H + OPT_STRIP_H;
+const DEF_PORT_DY = 12; // grey default port sits this far below the card bottom
 const V_GAP = 66;
 const H_GAP = 30;
 const PAD = 16;
@@ -75,7 +76,7 @@ type GNode = {
 };
 type CardDrag = { qId: string; parentId: string; startX: number };
 type GEdge = { id: string; d: string; kind: EdgeKind; fromQ: string; toQ: string | null; mid?: { x: number; y: number } };
-type Pending = { sourceQuestionId: string; optionId: string | null; fromX: number; fromY: number };
+type Pending = { sourceQuestionId: string; optionId: string | null; fromX: number; fromY: number; isDefault?: boolean };
 type Selected = { branchId: string; x: number; y: number };
 
 const EDGE_CLASS: Record<EdgeKind, string> = {
@@ -140,22 +141,37 @@ function buildLayout(questions: Question[], branches: QuestionBranch[]) {
     return Math.max(NODE_MIN_W, n * OPT_CELL_W);
   };
 
-  // Children of a question = distinct branch targets (in order) then the
-  // default next question, deduped. Used to build the spanning tree.
+  // The question's default child: the default branch's target when set (and not
+  // ending), else the next question by order. Drives both the spanning tree and
+  // the grey edge so they always agree with runtime fall-through.
+  const defaultTargetId = (qId: string) => {
+    const def = (branchesByQ.get(qId) ?? []).find((b) => b.is_default);
+    if (def) {
+      if (def.is_end) return undefined;
+      if (def.target_question_id && meta.has(def.target_question_id) && def.target_question_id !== qId) {
+        return def.target_question_id;
+      }
+      // Default set but target invalid → fall back to order.
+    }
+    const m = meta.get(qId);
+    return m ? questions[m.index + 1]?.id : undefined;
+  };
+
+  // Children of a question = distinct conditional branch targets (in order) then
+  // the default child, deduped. Used to build the spanning tree.
   const childList = (qId: string) => {
     const seen = new Set<string>();
     const out: { id: string; viaBranch: boolean }[] = [];
     for (const b of branchesByQ.get(qId) ?? []) {
-      if (b.is_end) continue;
+      if (b.is_end || b.is_default) continue;
       const t = b.target_question_id;
       if (t && meta.has(t) && t !== qId && !seen.has(t)) {
         seen.add(t);
         out.push({ id: t, viaBranch: true });
       }
     }
-    const m = meta.get(qId);
-    const nextId = m ? questions[m.index + 1]?.id : undefined;
-    if (nextId && !seen.has(nextId)) out.push({ id: nextId, viaBranch: false });
+    const defId = defaultTargetId(qId);
+    if (defId && !seen.has(defId)) out.push({ id: defId, viaBranch: false });
     return out;
   };
 
@@ -312,15 +328,27 @@ function buildLayout(questions: Question[], branches: QuestionBranch[]) {
 
   const edges: GEdge[] = [];
 
-  // Faint default fall-through edges (center bottom → next question, or → End
-  // for the last question).
+  // Faint default fall-through edges from the grey port → the default target
+  // (default branch when set, else next question by order, else End).
   for (const node of nodes) {
     const sx = node.x + node.w / 2;
-    const sy = node.y + NODE_H;
-    const nextQ = questions[node.index + 1];
-    if (nextQ) {
-      const tgt = byId.get(nextQ.id);
-      if (!tgt) continue;
+    const sy = node.y + NODE_H + DEF_PORT_DY;
+    const def = (branchesByQ.get(node.id) ?? []).find((b) => b.is_default);
+    let toEnd = false;
+    let destId: string | undefined;
+    if (def?.is_end) toEnd = true;
+    else if (def?.target_question_id && byId.has(def.target_question_id)) destId = def.target_question_id;
+
+    if (!toEnd && !destId) {
+      const nextQ = questions[node.index + 1];
+      if (nextQ && byId.has(nextQ.id)) destId = nextQ.id;
+      else toEnd = true;
+    }
+
+    if (toEnd) {
+      edges.push({ id: `def-${node.id}`, d: curvePath(sx, sy, endTop.x, endTop.y, 'default'), kind: 'default', fromQ: node.id, toQ: null });
+    } else if (destId) {
+      const tgt = byId.get(destId)!;
       const back = tgt.depth <= node.depth;
       edges.push({
         id: `def-${node.id}`,
@@ -328,14 +356,6 @@ function buildLayout(questions: Question[], branches: QuestionBranch[]) {
         kind: 'default',
         fromQ: node.id,
         toQ: tgt.id,
-      });
-    } else {
-      edges.push({
-        id: `def-${node.id}`,
-        d: curvePath(sx, sy, endTop.x, endTop.y, 'default'),
-        kind: 'default',
-        fromQ: node.id,
-        toQ: null,
       });
     }
   }
@@ -396,6 +416,7 @@ export default function FlowGraph({
   highlightIds: Set<string> | null;
 }) {
   const connectBranch = useQuestionnaireStore((s) => s.connectBranch);
+  const setDefaultBranch = useQuestionnaireStore((s) => s.setDefaultBranch);
   const addQuestion = useQuestionnaireStore((s) => s.addQuestion);
   const reorderBranches = useQuestionnaireStore((s) => s.reorderBranches);
 
@@ -442,15 +463,18 @@ export default function FlowGraph({
       const { x, y } = canvasPoint(e);
       if (Math.hypot(x - p.fromX, y - p.fromY) > DRAG_THRESHOLD) {
         const el = document.elementFromPoint(e.clientX, e.clientY);
+        const wire = p.isDefault
+          ? (target: { questionId: string } | { isEnd: true }) => setDefaultBranch(p.sourceQuestionId, target)
+          : (target: { questionId: string } | { isEnd: true }) => connectBranch(p.sourceQuestionId, p.optionId, target);
         if (el?.closest('[data-endnode]')) {
-          connectBranch(p.sourceQuestionId, p.optionId, { isEnd: true });
+          wire({ isEnd: true });
         } else {
           const targetId = el?.closest('[data-qid]')?.getAttribute('data-qid') ?? null;
           if (targetId && targetId !== p.sourceQuestionId) {
-            connectBranch(p.sourceQuestionId, p.optionId, { questionId: targetId });
+            wire({ questionId: targetId });
           } else if (!targetId) {
             const newId = addQuestion('radio');
-            connectBranch(p.sourceQuestionId, p.optionId, { questionId: newId });
+            wire({ questionId: newId });
           }
         }
       }
@@ -473,7 +497,7 @@ export default function FlowGraph({
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('keydown', onKey);
     };
-  }, [pending, connectBranch, addQuestion]);
+  }, [pending, connectBranch, setDefaultBranch, addQuestion]);
 
   // Horizontal card drag → reorder the parent's branches. Sibling order on
   // screen is derived from branch sort_order (= branch priority), so the move
@@ -485,7 +509,7 @@ export default function FlowGraph({
 
     const commit = (order: string[]) => {
       const sorted = branches
-        .filter((b) => b.question_id === d.parentId)
+        .filter((b) => b.question_id === d.parentId && !b.is_default)
         .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
       const firstIdx = (t: string) => sorted.findIndex((b) => !b.is_end && b.target_question_id === t);
       const from = firstIdx(d.qId);
@@ -544,6 +568,14 @@ export default function FlowGraph({
     e.stopPropagation();
     setSelected(null);
     setPending({ sourceQuestionId, optionId, fromX, fromY });
+    setCursor({ x: fromX, y: fromY });
+  };
+
+  const startDefaultWire = (e: React.PointerEvent, sourceQuestionId: string, fromX: number, fromY: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelected(null);
+    setPending({ sourceQuestionId, optionId: null, fromX, fromY, isDefault: true });
     setCursor({ x: fromX, y: fromY });
   };
 
@@ -611,6 +643,11 @@ export default function FlowGraph({
                 </div>
               ))}
             </div>
+            <span
+              className={styles.graphDefaultPort}
+              title="Drag to set the default next step"
+              onPointerDown={(e) => startDefaultWire(e, n.id, n.x + n.w / 2, n.y + NODE_H + DEF_PORT_DY)}
+            />
           </div>
           );
         })}
@@ -682,7 +719,7 @@ function EdgeInspector({
 
   const isChoice = CHOICE.includes(question.type);
   const siblings = branches
-    .filter((b) => b.question_id === question.id)
+    .filter((b) => b.question_id === question.id && !b.is_default)
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   const pos = siblings.findIndex((b) => b.id === branch.id);
 
