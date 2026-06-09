@@ -34,6 +34,7 @@ import {
   ArrowLeftRight,
   ArrowUpDown,
   ChevronDown,
+  ChevronUp,
   Hash,
   ImagePlus,
   Link2,
@@ -1119,6 +1120,91 @@ function SizeRow({
   );
 }
 
+/** Compact number field with Figma-style drag-to-scrub: press and drag up to
+ *  increase / down to decrease (~1 step per 2px), small chevron steppers, and
+ *  click-to-type. Used by the padding controls. */
+function ScrubInput({
+  value,
+  onChange,
+  min = 0,
+  max,
+  title,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  title?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const clamp = (n: number) => Math.min(max ?? Infinity, Math.max(min, n));
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    const startY = e.clientY;
+    const startVal = value;
+    let moved = false;
+    const onMove = (ev: MouseEvent) => {
+      const deltaY = startY - ev.clientY; // up = positive = increase
+      if (!moved) {
+        if (Math.abs(deltaY) < 3) return; // small threshold: click vs. drag
+        moved = true;
+        inputRef.current?.blur();
+        document.body.style.cursor = 'ns-resize';
+        document.body.style.userSelect = 'none';
+      }
+      ev.preventDefault();
+      onChange(clamp(startVal + Math.round(deltaY / 2)));
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      if (!moved) {
+        // A plain click (no drag) focuses for typing.
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  return (
+    <div className={styles.scrubField} title={title}>
+      <input
+        ref={inputRef}
+        type="number"
+        className={styles.scrubInput}
+        value={value}
+        onMouseDown={onMouseDown}
+        onChange={(e) => onChange(clamp(Number(e.target.value)))}
+      />
+      <div className={styles.scrubArrows}>
+        <button
+          type="button"
+          tabIndex={-1}
+          className={styles.scrubArrowBtn}
+          onClick={() => onChange(clamp(value + 1))}
+          aria-label="Increase"
+        >
+          <ChevronUp size={9} strokeWidth={2.5} />
+        </button>
+        <button
+          type="button"
+          tabIndex={-1}
+          className={styles.scrubArrowBtn}
+          onClick={() => onChange(clamp(value - 1))}
+          aria-label="Decrease"
+        >
+          <ChevronDown size={9} strokeWidth={2.5} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PaddingControl({
   padding,
   linked,
@@ -1135,12 +1221,7 @@ function PaddingControl({
   if (linked) {
     return (
       <div className={styles.paddingCtl}>
-        <input
-          type="number"
-          className={styles.fwInput}
-          value={padding.top}
-          onChange={(e) => onChangeAll(Number(e.target.value))}
-        />
+        <ScrubInput value={padding.top} onChange={onChangeAll} title="All sides" />
         <button
           type="button"
           className={`${styles.paddingLinkBtn} ${styles.paddingLinkBtnActive}`}
@@ -1164,34 +1245,10 @@ function PaddingControl({
   }
   return (
     <div className={styles.paddingCtlGrid}>
-      <input
-        type="number"
-        className={styles.fwInput}
-        value={padding.top}
-        onChange={(e) => onChange('top', Number(e.target.value))}
-        title="Top"
-      />
-      <input
-        type="number"
-        className={styles.fwInput}
-        value={padding.right}
-        onChange={(e) => onChange('right', Number(e.target.value))}
-        title="Right"
-      />
-      <input
-        type="number"
-        className={styles.fwInput}
-        value={padding.bottom}
-        onChange={(e) => onChange('bottom', Number(e.target.value))}
-        title="Bottom"
-      />
-      <input
-        type="number"
-        className={styles.fwInput}
-        value={padding.left}
-        onChange={(e) => onChange('left', Number(e.target.value))}
-        title="Left"
-      />
+      <ScrubInput value={padding.top} onChange={(v) => onChange('top', v)} title="Top" />
+      <ScrubInput value={padding.right} onChange={(v) => onChange('right', v)} title="Right" />
+      <ScrubInput value={padding.bottom} onChange={(v) => onChange('bottom', v)} title="Bottom" />
+      <ScrubInput value={padding.left} onChange={(v) => onChange('left', v)} title="Left" />
       <button
         type="button"
         className={styles.paddingLinkBtn}
