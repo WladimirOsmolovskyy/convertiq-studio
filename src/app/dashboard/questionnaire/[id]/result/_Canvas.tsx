@@ -13,6 +13,7 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import ResultPageRenderer from '@/components/ResultPageRenderer';
+import { pageBackgroundCss } from './_pageBackground';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import { resolveDesign } from '@/lib/designResolve';
 import {
@@ -56,6 +57,9 @@ export default function Canvas({ page, selectedNodeId, onSelectNode }: Props) {
   // Resolve colors against brand so the result-page preview matches the
   // published render (and tolerates sparse/new-questionnaire designs).
   const resolvedDesign = resolveDesign(design, brand);
+  // The stage sits on the page's real background (matching production), so
+  // authors design against the actual surface rather than editor grey.
+  const pageBg = pageBackgroundCss(design, resolvedDesign);
 
   // Editor uses synthetic sample data so authors see real-looking content.
   const sampleCtx: ResultRenderContext = {
@@ -142,7 +146,7 @@ export default function Canvas({ page, selectedNodeId, onSelectNode }: Props) {
         </span>
       </div>
 
-      <div className={styles.canvasStage} onClick={() => onSelectNode(null)}>
+      <div className={styles.canvasStage} style={{ background: pageBg }} onClick={() => onSelectNode(null)}>
         <ResultPageRenderer
           page={page}
           ctx={sampleCtx}
