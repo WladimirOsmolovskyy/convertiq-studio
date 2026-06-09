@@ -86,6 +86,10 @@ export interface QuestionnaireRendererProps {
 
 const hasOptions = (type: string) => ['radio', 'checkbox', 'dropdown'].includes(type);
 
+/** Brief pause after picking a radio answer so the selection highlight is
+ *  visible before the question auto-advances — a small confirmation beat. */
+const SELECT_FEEDBACK_MS = 220;
+
 /** Convert sparse `design.elements[id]` overrides into inline CSS. Only the
  *  fields wired in Commit C are emitted (fill, radius, padding); VarRefs are
  *  ignored for now and will be resolved in phase 2. */
@@ -151,6 +155,9 @@ export default function QuestionnaireRenderer({
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [showLeadCapture, setShowLeadCapture] = useState(false);
   const [leadCaptureError, setLeadCaptureError] = useState<string | null>(null);
+  // Locks the radio auto-advance during the selection-feedback pause so a
+  // second click can't double-advance.
+  const [isAdvancing, setIsAdvancing] = useState(false);
 
   const effectiveLeadFields = useMemo(
     () => resolveLeadFields(templateLeadFields, questionnaire.lead_fields),
@@ -231,18 +238,24 @@ export default function QuestionnaireRenderer({
   };
 
   const handleRadioSelect = async (optionId: string) => {
-    if (!currentQuestion || submitting) return;
+    if (!currentQuestion || submitting || isAdvancing) return;
+    setIsAdvancing(true);
     const newAnswers: AnswersMap = {
       ...answers,
       [currentQuestion.id]: { selected_options: [optionId] },
     };
     setAnswers(newAnswers);
 
+    // Hold on the highlighted selection briefly so the user sees their
+    // choice register before the question auto-advances.
+    await new Promise((resolve) => setTimeout(resolve, SELECT_FEEDBACK_MS));
+
     const nextIdx = getNextQuestionIndex(currentIndex, newAnswers);
     const reachedEnd = nextIdx === -1 || nextIdx >= questions.length;
     if (reachedEnd) {
       if (customLeadFields.length > 0 && !showLeadCapture) {
         setShowLeadCapture(true);
+        setIsAdvancing(false);
         return;
       }
       await submitAndFinish(newAnswers);
@@ -250,6 +263,7 @@ export default function QuestionnaireRenderer({
       setCurrentIndex(nextIdx);
       setQuestionPath((prev) => [...prev, nextIdx]);
     }
+    setIsAdvancing(false);
   };
 
   const handleOptionSelect = (optionId: string) => {
