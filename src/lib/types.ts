@@ -337,6 +337,7 @@ export interface DesignConfig {
     spacing: number; // rem
     borderRadius: number; // px
     questionSpacing: number; // rem
+    optionGap?: number; // px — gap between answer options
   };
   /** Component styling. Each sub-object is SPARSE — absent fields are
    *  derived from the resolved colors at render time. The five keys are

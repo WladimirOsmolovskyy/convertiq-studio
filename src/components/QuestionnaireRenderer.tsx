@@ -714,6 +714,7 @@ export default function QuestionnaireRenderer({
                         ? styles.optionsGrid
                         : styles.optionsList
                     }
+                    style={{ gap: `${d.layout.optionGap ?? 8}px` }}
                   >
                     {currentQuestion.options.map((opt) => {
                       const isSelected = answers[currentQuestion.id]?.selected_options?.includes(
