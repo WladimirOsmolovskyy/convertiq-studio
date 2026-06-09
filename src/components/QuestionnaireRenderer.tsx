@@ -523,6 +523,9 @@ export default function QuestionnaireRenderer({
                 always shown on the editable canvas so it stays selectable. */}
             {(selectableMode || currentIndex + 1 >= (d.behavior?.progressStartQuestion ?? 1)) && (() => {
               const sel = interact('progress');
+              const readout = (d.behavior?.progressDisplayMode ?? 'percent') === 'fraction'
+                ? `Question ${showLeadCapture ? questions.length : questionPath.length} of ${questions.length}`
+                : `${showLeadCapture ? 100 : Math.round(progress)}%`;
               return (
                 <div
                   className={`${styles.progressWrap} ${sel.className}`.trim()}
@@ -534,7 +537,7 @@ export default function QuestionnaireRenderer({
                 >
                   <div className={styles.progressLabel} style={{ color: d.colors.textMuted }}>
                     <span>{questionnaire.title}</span>
-                    <span>{showLeadCapture ? 100 : Math.round(progress)}%</span>
+                    <span>{readout}</span>
                   </div>
                   <div
                     className={styles.progressBar}

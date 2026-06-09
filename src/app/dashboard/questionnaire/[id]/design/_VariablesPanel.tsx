@@ -378,6 +378,19 @@ export default function VariablesPanel() {
         <SliderField label="Show progress from Q" value={design.behavior?.progressStartQuestion ?? 1} onChange={(v) => updateDesign({ behavior: { ...design.behavior, progressStartQuestion: v } })} min={1} max={Math.max(1, questions.length)} step={1} />
         <ToggleField label="Show back button" checked={design.behavior?.showBackButton ?? true} onChange={(v) => updateDesign({ behavior: { ...design.behavior, showBackButton: v } })} />
         <ToggleField label="Allow going back" checked={design.behavior?.allowBack ?? true} onChange={(v) => updateDesign({ behavior: { ...design.behavior, allowBack: v } })} />
+        <div className={editorStyles.sliderRow}>
+          <span className={editorStyles.sliderLabel}>Progress label</span>
+          <div style={{ display: 'flex', gap: '0.375rem' }}>
+            {(['percent', 'fraction'] as const).map((m) => (
+              <button key={m}
+                className={`btn btn-sm ${(design.behavior?.progressDisplayMode ?? 'percent') === m ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => updateDesign({ behavior: { ...design.behavior, progressDisplayMode: m } })}
+              >
+                {m === 'percent' ? 'Percent' : 'Count'}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Page background */}

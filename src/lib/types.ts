@@ -402,6 +402,9 @@ export interface DesignConfig {
     /** Whether the respondent may navigate backward (default true). When
      *  false, the Back button is hidden regardless of `showBackButton`. */
     allowBack?: boolean;
+    /** Progress label format: 'percent' → "42%", 'fraction' → "Question 3
+     *  of 8" (default 'percent'). */
+    progressDisplayMode?: 'percent' | 'fraction';
   };
 }
 
