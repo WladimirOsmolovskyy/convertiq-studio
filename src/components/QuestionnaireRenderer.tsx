@@ -209,6 +209,8 @@ export default function QuestionnaireRenderer({
   // Identity for fully-populated configs (existing questionnaires); fills
   // gaps from brand (new questionnaires). All style reads below use `d`.
   const d = resolveDesign(design, brand);
+  // Back button shows only when both toggles allow it (default true).
+  const showBackBtn = (d.behavior?.showBackButton ?? true) && (d.behavior?.allowBack ?? true);
 
   const getBackgroundCSS = () => {
     if (d.background.type === 'gradient') return d.background.value;
@@ -874,7 +876,9 @@ export default function QuestionnaireRenderer({
             })()}
 
             {/* Navigation */}
-            <div className={styles.navButtons} style={{ marginTop: `${d.layout.questionSpacing}rem` }}>
+            {(showBackBtn || showLeadCapture || currentQuestion?.type !== 'radio') && (
+            <div className={styles.navButtons} style={{ marginTop: `${d.layout.questionSpacing}rem`, justifyContent: showBackBtn ? undefined : 'flex-end' }}>
+              {showBackBtn && (
               <button
                 className={styles.backBtn}
                 onClick={() => {
@@ -890,6 +894,7 @@ export default function QuestionnaireRenderer({
               >
                 ← Back
               </button>
+              )}
               {/* Radio questions auto-advance on click — Next button is redundant
                   there. Keep it for every other input type and the lead-capture step. */}
               {(showLeadCapture || currentQuestion?.type !== 'radio') && (() => {
@@ -922,6 +927,7 @@ export default function QuestionnaireRenderer({
                 );
               })()}
             </div>
+            )}
           </>
         ) : (
           /* Results — render the matched ResultPage's authored content

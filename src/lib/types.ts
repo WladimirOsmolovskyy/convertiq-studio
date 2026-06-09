@@ -397,6 +397,11 @@ export interface DesignConfig {
     /** 1-based question number from which the progress bar becomes visible
      *  (default 1 = always shown). */
     progressStartQuestion?: number;
+    /** Whether to show the Back button (default true). */
+    showBackButton?: boolean;
+    /** Whether the respondent may navigate backward (default true). When
+     *  false, the Back button is hidden regardless of `showBackButton`. */
+    allowBack?: boolean;
   };
 }
 

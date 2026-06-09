@@ -151,6 +151,22 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h3 className={editorStyles.designSectionTitle}>{children}</h3>;
 }
 
+function ToggleField({ label, checked, onChange }: {
+  label: string; checked: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className={editorStyles.sliderRow}>
+      <span className={editorStyles.sliderLabel}>{label}</span>
+      <button
+        type="button"
+        className={`${editorStyles.toggle} ${checked ? editorStyles.active : ''}`.trim()}
+        onClick={() => onChange(!checked)}
+        aria-pressed={checked}
+      />
+    </div>
+  );
+}
+
 /** Heading or Body type style — font, weight, size, line-height, spacing.
  *  Text COLOR is not here; it lives in the Colors section (Text token). */
 function FontPanel({
@@ -360,6 +376,8 @@ export default function VariablesPanel() {
         <SectionTitle>Behavior</SectionTitle>
         <SliderField label="Auto-advance delay" value={design.behavior?.selectFeedbackMs ?? SELECT_FEEDBACK_MS} onChange={(v) => updateDesign({ behavior: { ...design.behavior, selectFeedbackMs: v } })} min={0} max={800} step={20} unit="ms" />
         <SliderField label="Show progress from Q" value={design.behavior?.progressStartQuestion ?? 1} onChange={(v) => updateDesign({ behavior: { ...design.behavior, progressStartQuestion: v } })} min={1} max={Math.max(1, questions.length)} step={1} />
+        <ToggleField label="Show back button" checked={design.behavior?.showBackButton ?? true} onChange={(v) => updateDesign({ behavior: { ...design.behavior, showBackButton: v } })} />
+        <ToggleField label="Allow going back" checked={design.behavior?.allowBack ?? true} onChange={(v) => updateDesign({ behavior: { ...design.behavior, allowBack: v } })} />
       </div>
 
       {/* Page background */}
