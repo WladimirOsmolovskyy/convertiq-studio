@@ -6,13 +6,14 @@
  * Three-tier color model:
  *   element override  →  questionnaire variable (design.colors)  →  Brand token
  *
- * `resolveDesign` fills any ABSENT color / component value from the Brand
- * palette (via the mapping below) and derives component colors the same
- * way the editor used to (the logic moved here from
- * `syncColorsToComponents`). Values that ARE present win — so existing
- * questionnaires, whose configs are fully populated, resolve to exactly
- * their stored values (identity). Sparse configs (new questionnaires,
- * whose `colors`/`components` are empty) fall through to Brand.
+ * `resolveDesign` fills any ABSENT color value from the Brand palette (via
+ * the mapping below) and derives component colors the same way the editor
+ * used to (the logic moved here from `syncColorsToComponents`). Stored
+ * questionnaire color variables (`design.colors`) still win over Brand.
+ * Stored COMPONENT colors, though — a deprecated layer once cached by the
+ * editor — are now ignored and always re-derived from the resolved colors,
+ * so legacy questionnaires track the Brand. Only structural component
+ * fields (padding, radius, font size, height) still honour a stored value.
  *
  * Because `defaultBrandPalette` equals the historical default questionnaire
  * colors, an empty design resolved against the default brand reproduces the
@@ -31,7 +32,7 @@ type Colors = NonNullable<DesignConfig['colors']>;
 type StoredComponents = DesignConfig['components'];
 
 /** Fully-resolved shapes (every field present). */
-export type ResolvedColors = Required<Colors>;
+export type ResolvedColors = Required<Colors> & { heading: string; surfaceHighlight: string };
 export type ResolvedComponents = {
   [K in keyof StoredComponents]-?: Required<NonNullable<StoredComponents[K]>>;
 };
@@ -47,10 +48,12 @@ const COLOR_TO_BRAND: Record<keyof ResolvedColors, BrandTokenId> = {
   background: 'background.primary',
   surface: 'surface',
   text: 'body',
-  textMuted: 'body.secondary',
+  textMuted: 'line.highlight',
   accent: 'brand.core',
   error: 'brand.highlight',
   success: 'brand.accent',
+  heading: 'heading',
+  surfaceHighlight: 'surface.highlight',
 };
 
 /** Literal fallbacks for color variables that don't map cleanly to brand. */
@@ -91,7 +94,7 @@ export function resolveColors(
   brand: BrandPalette | undefined,
 ): ResolvedColors {
   const c: Colors = stored ?? {};
-  const fromBrand = (key: keyof ResolvedColors) =>
+  const fromBrand = (key: keyof Colors) =>
     c[key] ?? COLOR_LITERAL_FALLBACK[key] ?? resolveBrandToken(brand, COLOR_TO_BRAND[key]);
   return {
     primary: c.primary ?? resolveBrandToken(brand, COLOR_TO_BRAND.primary),
@@ -103,6 +106,8 @@ export function resolveColors(
     accent: c.accent ?? c.primary ?? resolveBrandToken(brand, COLOR_TO_BRAND.accent),
     error: fromBrand('error'),
     success: fromBrand('success'),
+    heading: resolveBrandToken(brand, COLOR_TO_BRAND.heading),
+    surfaceHighlight: resolveBrandToken(brand, COLOR_TO_BRAND.surfaceHighlight),
   };
 }
 
@@ -114,39 +119,45 @@ function deriveComponents(
   const bg = colors.background;
   const primary = colors.primary;
   const surface = colors.surface;
+  const surfaceHighlight = colors.surfaceHighlight;
   const light = isLight(isValidHex(bg) ? bg : '#ffffff');
+  // Color fields derive straight from the resolved Brand colors — stored
+  // component colors (a deprecated layer cached by an older editor) are
+  // intentionally ignored so legacy questionnaires follow the Brand. Only
+  // structural fields (padding, radius, font size, height) still honour a
+  // stored value.
   const s: Partial<StoredComponents> = stored ?? {};
 
   return {
     question: {
-      background: s.question?.background ?? surface,
-      border: s.question?.border ?? `1px solid ${light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
-      shadow: s.question?.shadow ?? (light ? '0 2px 8px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' : '0 4px 24px rgba(0,0,0,0.3)'),
+      background: surface,
+      border: `1px solid ${light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
+      shadow: light ? '0 2px 8px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)' : '0 4px 24px rgba(0,0,0,0.3)',
       padding: s.question?.padding ?? '2rem',
     },
     option: {
-      background: s.option?.background ?? (light ? adjustBrightness(isValidHex(bg) ? bg : '#ffffff', -8) : 'rgba(255,255,255,0.04)'),
-      hoverBackground: s.option?.hoverBackground ?? (light ? adjustBrightness(isValidHex(bg) ? bg : '#ffffff', -16) : 'rgba(255,255,255,0.08)'),
-      selectedBackground: s.option?.selectedBackground ?? rgba(isValidHex(primary) ? primary : '#007aff', 0.08),
-      border: s.option?.border ?? `1px solid ${light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`,
-      selectedBorder: s.option?.selectedBorder ?? `1px solid ${rgba(isValidHex(primary) ? primary : '#007aff', 0.4)}`,
+      background: surfaceHighlight,
+      hoverBackground: light ? adjustBrightness(isValidHex(bg) ? bg : '#ffffff', -16) : 'rgba(255,255,255,0.08)',
+      selectedBackground: rgba(isValidHex(primary) ? primary : '#007aff', 0.08),
+      border: `1px solid ${light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`,
+      selectedBorder: `1px solid ${rgba(isValidHex(primary) ? primary : '#007aff', 0.4)}`,
     },
     button: {
-      background: s.button?.background ?? primary,
-      color: s.button?.color ?? (isLight(isValidHex(primary) ? primary : '#007aff') ? '#000000' : '#ffffff'),
+      background: primary,
+      color: isLight(isValidHex(primary) ? primary : '#007aff') ? '#000000' : '#ffffff',
       borderRadius: s.button?.borderRadius ?? 980,
       padding: s.button?.padding ?? '0.875rem 2rem',
       fontSize: s.button?.fontSize ?? 16,
     },
     progress: {
-      background: s.progress?.background ?? (light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'),
-      fillColor: s.progress?.fillColor ?? primary,
+      background: light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)',
+      fillColor: primary,
       height: s.progress?.height ?? 4,
     },
     input: {
-      background: s.input?.background ?? surface,
-      border: s.input?.border ?? `1px solid ${light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`,
-      focusBorder: s.input?.focusBorder ?? `1px solid ${primary}`,
+      background: surface,
+      border: `1px solid ${light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)'}`,
+      focusBorder: `1px solid ${primary}`,
       borderRadius: s.input?.borderRadius ?? 10,
     },
   };

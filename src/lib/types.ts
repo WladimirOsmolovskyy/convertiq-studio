@@ -337,6 +337,7 @@ export interface DesignConfig {
     spacing: number; // rem
     borderRadius: number; // px
     questionSpacing: number; // rem
+    optionGap?: number; // px — gap between answer options
   };
   /** Component styling. Each sub-object is SPARSE — absent fields are
    *  derived from the resolved colors at render time. The five keys are
@@ -388,6 +389,23 @@ export interface DesignConfig {
    * inspector UI shell compiles; renderer applies them only when present.
    */
   elements?: Partial<Record<ElementId, ElementStyles>>;
+  /** Respondent-facing interaction behavior for the published questionnaire. */
+  behavior?: {
+    /** Pause (ms) on a picked answer before a single-choice question
+     *  auto-advances — a brief selection confirmation. */
+    selectFeedbackMs?: number;
+    /** 1-based question number from which the progress bar becomes visible
+     *  (default 1 = always shown). */
+    progressStartQuestion?: number;
+    /** Whether to show the Back button (default true). */
+    showBackButton?: boolean;
+    /** Whether the respondent may navigate backward (default true). When
+     *  false, the Back button is hidden regardless of `showBackButton`. */
+    allowBack?: boolean;
+    /** Progress label format: 'percent' → "42%", 'fraction' → "Question 3
+     *  of 8" (default 'percent'). */
+    progressDisplayMode?: 'percent' | 'fraction';
+  };
 }
 
 /**
@@ -504,6 +522,10 @@ export const defaultDesign: DesignConfig = {
     value: '#f5f5f7',
   },
 };
+
+/** Default pause (ms) on a picked answer before a single-choice question
+ *  auto-advances. Overridable per questionnaire via `design.behavior`. */
+export const SELECT_FEEDBACK_MS = 220;
 
 /* ─── Project ───────────────────────────────────────────────────── */
 

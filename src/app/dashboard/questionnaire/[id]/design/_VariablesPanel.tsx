@@ -11,6 +11,7 @@
  *   Typography  — Heading / Body: font · weight · size · line-height · spacing
  *   Layout      — content width · radius · card padding · question spacing
  *   Background  — page background mode (solid uses the Background color)
+ *   Behavior    — auto-advance delay after picking a single-choice answer
  *
  * Per-element styling (button, progress, options, inputs, card) lives in the
  * Inspector tab — select the element on the canvas. This panel intentionally
@@ -20,6 +21,7 @@
 import { RotateCcw, Link2 } from 'lucide-react';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import { resolveDesign } from '@/lib/designResolve';
+import { SELECT_FEEDBACK_MS } from '@/lib/types';
 import { isValidHex, parseColor, buildColor } from '@/lib/color';
 import editorStyles from '../editor.module.css';
 import designStyles from './design.module.css';
@@ -149,6 +151,22 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h3 className={editorStyles.designSectionTitle}>{children}</h3>;
 }
 
+function ToggleField({ label, checked, onChange }: {
+  label: string; checked: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className={editorStyles.sliderRow}>
+      <span className={editorStyles.sliderLabel}>{label}</span>
+      <button
+        type="button"
+        className={`${editorStyles.toggle} ${checked ? editorStyles.active : ''}`.trim()}
+        onClick={() => onChange(!checked)}
+        aria-pressed={checked}
+      />
+    </div>
+  );
+}
+
 /** Heading or Body type style — font, weight, size, line-height, spacing.
  *  Text COLOR is not here; it lives in the Colors section (Text token). */
 function FontPanel({
@@ -250,7 +268,7 @@ function FontPanel({
 
 /* ── Main Component ────────────────────────────────────────────── */
 export default function VariablesPanel() {
-  const { design, brand, updateDesign } = useQuestionnaireStore();
+  const { design, brand, updateDesign, questions } = useQuestionnaireStore();
   // Resolved view for DISPLAY — fields the questionnaire doesn't override
   // show their inherited Brand value. Writes still set sparse overrides.
   const r = resolveDesign(design, brand);
@@ -349,7 +367,30 @@ export default function VariablesPanel() {
         <SliderField label="Content Width" value={design.layout.maxWidth} onChange={(v) => updateDesign({ layout: { ...design.layout, maxWidth: v } })} min={400} max={1200} step={20} unit="px" />
         <SliderField label="Corner Radius" value={design.layout.borderRadius} onChange={(v) => updateDesign({ layout: { ...design.layout, borderRadius: v } })} min={0} max={30} unit="px" />
         <SliderField label="Card Padding" value={design.layout.padding} onChange={(v) => updateDesign({ layout: { ...design.layout, padding: v } })} min={0.5} max={4} step={0.25} unit="rem" />
-        <SliderField label="Question Spacing" value={design.layout.questionSpacing} onChange={(v) => updateDesign({ layout: { ...design.layout, questionSpacing: v } })} min={0.5} max={4} step={0.25} unit="rem" />
+        <SliderField label="Question Gap" value={Math.round(design.layout.questionSpacing * 16)} onChange={(v) => updateDesign({ layout: { ...design.layout, questionSpacing: v / 16 } })} min={8} max={64} step={2} unit="px" />
+        <SliderField label="Option Gap" value={design.layout.optionGap ?? 8} onChange={(v) => updateDesign({ layout: { ...design.layout, optionGap: v } })} min={0} max={40} step={2} unit="px" />
+      </div>
+
+      {/* Behavior */}
+      <div className={editorStyles.designSection}>
+        <SectionTitle>Behavior</SectionTitle>
+        <SliderField label="Auto-advance delay" value={design.behavior?.selectFeedbackMs ?? SELECT_FEEDBACK_MS} onChange={(v) => updateDesign({ behavior: { ...design.behavior, selectFeedbackMs: v } })} min={0} max={800} step={20} unit="ms" />
+        <SliderField label="Show progress from Q" value={design.behavior?.progressStartQuestion ?? 1} onChange={(v) => updateDesign({ behavior: { ...design.behavior, progressStartQuestion: v } })} min={1} max={Math.max(1, questions.length)} step={1} />
+        <ToggleField label="Show back button" checked={design.behavior?.showBackButton ?? true} onChange={(v) => updateDesign({ behavior: { ...design.behavior, showBackButton: v } })} />
+        <ToggleField label="Allow going back" checked={design.behavior?.allowBack ?? true} onChange={(v) => updateDesign({ behavior: { ...design.behavior, allowBack: v } })} />
+        <div className={editorStyles.sliderRow}>
+          <span className={editorStyles.sliderLabel}>Progress label</span>
+          <div style={{ display: 'flex', gap: '0.375rem' }}>
+            {(['percent', 'fraction'] as const).map((m) => (
+              <button key={m}
+                className={`btn btn-sm ${(design.behavior?.progressDisplayMode ?? 'percent') === m ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => updateDesign({ behavior: { ...design.behavior, progressDisplayMode: m } })}
+              >
+                {m === 'percent' ? 'Percent' : 'Count'}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Page background */}

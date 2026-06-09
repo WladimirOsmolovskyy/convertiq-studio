@@ -39,6 +39,7 @@ import type {
   ResultPage,
   ScoringRule,
 } from '@/lib/types';
+import { SELECT_FEEDBACK_MS } from '@/lib/types';
 import { resolveDesign } from '@/lib/designResolve';
 import { isCustomField, resolveLeadFields } from '@/lib/leadFields';
 import { buildLeadPayload } from '@/lib/leadPayload';
@@ -151,6 +152,9 @@ export default function QuestionnaireRenderer({
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [showLeadCapture, setShowLeadCapture] = useState(false);
   const [leadCaptureError, setLeadCaptureError] = useState<string | null>(null);
+  // Locks the radio auto-advance during the selection-feedback pause so a
+  // second click can't double-advance.
+  const [isAdvancing, setIsAdvancing] = useState(false);
 
   const effectiveLeadFields = useMemo(
     () => resolveLeadFields(templateLeadFields, questionnaire.lead_fields),
@@ -205,6 +209,8 @@ export default function QuestionnaireRenderer({
   // Identity for fully-populated configs (existing questionnaires); fills
   // gaps from brand (new questionnaires). All style reads below use `d`.
   const d = resolveDesign(design, brand);
+  // Back button shows only when both toggles allow it (default true).
+  const showBackBtn = (d.behavior?.showBackButton ?? true) && (d.behavior?.allowBack ?? true);
 
   const getBackgroundCSS = () => {
     if (d.background.type === 'gradient') return d.background.value;
@@ -231,18 +237,26 @@ export default function QuestionnaireRenderer({
   };
 
   const handleRadioSelect = async (optionId: string) => {
-    if (!currentQuestion || submitting) return;
+    if (!currentQuestion || submitting || isAdvancing) return;
+    setIsAdvancing(true);
     const newAnswers: AnswersMap = {
       ...answers,
       [currentQuestion.id]: { selected_options: [optionId] },
     };
     setAnswers(newAnswers);
 
+    // Hold on the highlighted selection briefly so the user sees their
+    // choice register before the question auto-advances.
+    await new Promise((resolve) =>
+      setTimeout(resolve, d.behavior?.selectFeedbackMs ?? SELECT_FEEDBACK_MS),
+    );
+
     const nextIdx = getNextQuestionIndex(currentIndex, newAnswers);
     const reachedEnd = nextIdx === -1 || nextIdx >= questions.length;
     if (reachedEnd) {
       if (customLeadFields.length > 0 && !showLeadCapture) {
         setShowLeadCapture(true);
+        setIsAdvancing(false);
         return;
       }
       await submitAndFinish(newAnswers);
@@ -250,6 +264,7 @@ export default function QuestionnaireRenderer({
       setCurrentIndex(nextIdx);
       setQuestionPath((prev) => [...prev, nextIdx]);
     }
+    setIsAdvancing(false);
   };
 
   const handleOptionSelect = (optionId: string) => {
@@ -504,9 +519,13 @@ export default function QuestionnaireRenderer({
       >
         {!completed ? (
           <>
-            {/* Progress */}
-            {(() => {
+            {/* Progress — gated by `progressStartQuestion` on the live page;
+                always shown on the editable canvas so it stays selectable. */}
+            {(selectableMode || currentIndex + 1 >= (d.behavior?.progressStartQuestion ?? 1)) && (() => {
               const sel = interact('progress');
+              const readout = (d.behavior?.progressDisplayMode ?? 'percent') === 'fraction'
+                ? `Question ${showLeadCapture ? questions.length : questionPath.length} of ${questions.length}`
+                : `${showLeadCapture ? 100 : Math.round(progress)}%`;
               return (
                 <div
                   className={`${styles.progressWrap} ${sel.className}`.trim()}
@@ -518,7 +537,7 @@ export default function QuestionnaireRenderer({
                 >
                   <div className={styles.progressLabel} style={{ color: d.colors.textMuted }}>
                     <span>{questionnaire.title}</span>
-                    <span>{showLeadCapture ? 100 : Math.round(progress)}%</span>
+                    <span>{readout}</span>
                   </div>
                   <div
                     className={styles.progressBar}
@@ -566,7 +585,7 @@ export default function QuestionnaireRenderer({
                     fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
                     lineHeight: d.typography.heading?.lineHeight ?? 1.2,
                     letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
-                    color: d.colors.text,
+                    color: d.colors.heading,
                     ...elementOverrideStyle(d, 'questionTitle'),
                   }}
                 >
@@ -673,7 +692,7 @@ export default function QuestionnaireRenderer({
                     fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
                     lineHeight: d.typography.heading?.lineHeight ?? 1.2,
                     letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
-                    color: d.colors.text,
+                    color: d.colors.heading,
                     ...elementOverrideStyle(d, 'questionTitle'),
                   }}
                 >
@@ -701,6 +720,7 @@ export default function QuestionnaireRenderer({
                         ? styles.optionsGrid
                         : styles.optionsList
                     }
+                    style={{ gap: `${d.layout.optionGap ?? 8}px` }}
                   >
                     {currentQuestion.options.map((opt) => {
                       const isSelected = answers[currentQuestion.id]?.selected_options?.includes(
@@ -859,7 +879,9 @@ export default function QuestionnaireRenderer({
             })()}
 
             {/* Navigation */}
-            <div className={styles.navButtons} style={{ marginTop: `${d.layout.questionSpacing}rem` }}>
+            {(showBackBtn || showLeadCapture || currentQuestion?.type !== 'radio') && (
+            <div className={styles.navButtons} style={{ marginTop: `${d.layout.questionSpacing}rem`, justifyContent: showBackBtn ? undefined : 'flex-end' }}>
+              {showBackBtn && (
               <button
                 className={styles.backBtn}
                 onClick={() => {
@@ -875,6 +897,7 @@ export default function QuestionnaireRenderer({
               >
                 ← Back
               </button>
+              )}
               {/* Radio questions auto-advance on click — Next button is redundant
                   there. Keep it for every other input type and the lead-capture step. */}
               {(showLeadCapture || currentQuestion?.type !== 'radio') && (() => {
@@ -907,6 +930,7 @@ export default function QuestionnaireRenderer({
                 );
               })()}
             </div>
+            )}
           </>
         ) : (
           /* Results — render the matched ResultPage's authored content
@@ -932,7 +956,7 @@ export default function QuestionnaireRenderer({
                         fontFamily: d.typography.headingFont,
                         fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
                         letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
-                        color: d.colors.text,
+                        color: d.colors.heading,
                       }}
                     >
                       Thank you!
