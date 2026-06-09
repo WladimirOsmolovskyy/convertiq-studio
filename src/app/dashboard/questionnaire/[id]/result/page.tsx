@@ -11,7 +11,7 @@
  */
 
 import type { CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import LeftRail from './_LeftRail';
 import Canvas from './_Canvas';
@@ -44,6 +44,28 @@ export default function ResultEditor() {
     setExplicitSelectedPageId(id);
     setSelectedNodeId(null);
   };
+
+  // Delete the selected block on Delete/Backspace — wherever it was selected
+  // (canvas or layers panel). Bails while typing in a field, and never deletes
+  // the root frame.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      if (!selectedNodeId || !selectedPageId) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
+        return;
+      }
+      const { resultPages: pages, removeResultPageNode } = useQuestionnaireStore.getState();
+      const pg = pages.find((p) => p.id === selectedPageId);
+      if (!pg || selectedNodeId === pg.content.id) return; // missing, or root frame
+      e.preventDefault();
+      removeResultPageNode(selectedPageId, selectedNodeId);
+      setSelectedNodeId(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedNodeId, selectedPageId]);
 
   // Persisted, drag-resizable rail widths. Stored per-user in localStorage
   // so they survive reloads but stay scoped to this editor.
