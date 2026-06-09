@@ -11,8 +11,9 @@
  */
 
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Maximize, Plus } from 'lucide-react';
 import ResultPageRenderer from '@/components/ResultPageRenderer';
+import FullPreview from './_FullPreview';
 import { pageBackgroundCss } from './_pageBackground';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
 import { resolveDesign } from '@/lib/designResolve';
@@ -53,6 +54,7 @@ const BLOCK_PRESETS: BlockOption[] = [
 export default function Canvas({ page, selectedNodeId, onSelectNode }: Props) {
   const { design, brand, questions, addResultPageNode } = useQuestionnaireStore();
   const [showBlockMenu, setShowBlockMenu] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Resolve colors against brand so the result-page preview matches the
   // published render (and tolerates sparse/new-questionnaire designs).
@@ -144,6 +146,9 @@ export default function Canvas({ page, selectedNodeId, onSelectNode }: Props) {
             ? `Next block → ${resolveAddTarget() === page.content.id ? 'root' : 'selected frame'}`
             : 'Sample preview · score 75'}
         </span>
+        <button className="btn btn-ghost btn-sm" onClick={() => setPreviewOpen(true)}>
+          <Maximize size={12} strokeWidth={2.25} /> Preview
+        </button>
       </div>
 
       <div className={styles.canvasStage} style={{ background: pageBg }} onClick={() => onSelectNode(null)}>
@@ -156,6 +161,8 @@ export default function Canvas({ page, selectedNodeId, onSelectNode }: Props) {
           onSelectNode={onSelectNode}
         />
       </div>
+
+      {previewOpen && <FullPreview page={page} onClose={() => setPreviewOpen(false)} />}
     </div>
   );
 }
