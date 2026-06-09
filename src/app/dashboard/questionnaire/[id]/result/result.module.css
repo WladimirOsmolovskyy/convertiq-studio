@@ -1145,10 +1145,32 @@
   width: 100%;
 }
 .paddingCtlGrid {
+  /* Per-side padding: 2×2 inputs so they stay usable in a narrow rail
+     instead of collapsing into one cramped row. */
   display: grid;
-  grid-template-columns: repeat(4, 1fr) 30px;
+  grid-template-columns: 1fr 1fr 30px;
   gap: 0.25rem;
   width: 100%;
+  align-items: center;
+}
+/* Link toggle spans both input rows on the right. */
+.paddingCtlGrid .paddingLinkBtn {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
+/* Drop native number-spinner arrows in padding fields — at narrow widths they
+   overrun the per-side inputs. Padding values are typed. */
+.paddingCtl input[type='number'],
+.paddingCtlGrid input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.paddingCtl input[type='number']::-webkit-inner-spin-button,
+.paddingCtl input[type='number']::-webkit-outer-spin-button,
+.paddingCtlGrid input[type='number']::-webkit-inner-spin-button,
+.paddingCtlGrid input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 .paddingLinkBtn {
   display: inline-flex;
