@@ -69,7 +69,7 @@ export default function InspectorPanel({ selectedElementId }: Props) {
   const paddingSet = typeof override.padding === 'number';
   const fillValue = fillSet ? (override.fill as string) : '';
   const radiusValue = radiusSet ? (override.radius as number) : '';
-  const paddingValue = paddingSet ? (override.padding as number) : '';
+  const paddingValue = paddingSet ? Math.round((override.padding as number) * 16) : '';
 
   // Active/selected-state overrides — only answer options have a selected look.
   const isOption = selectedElementId === 'radio.option' || selectedElementId === 'checkbox.option';
@@ -130,20 +130,20 @@ export default function InspectorPanel({ selectedElementId }: Props) {
               value={paddingValue}
               placeholder="Inherited"
               min={0}
-              step={0.25}
+              step={2}
               onChange={(e) => {
                 const v = e.target.value;
-                setStyle({ padding: v === '' ? undefined : Number(v) });
+                setStyle({ padding: v === '' ? undefined : Number(v) / 16 });
               }}
             />
             <input
               type="range"
               className={styles.slider}
               min={0}
-              max={4}
-              step={0.125}
+              max={64}
+              step={2}
               value={typeof paddingValue === 'number' ? paddingValue : 0}
-              onChange={(e) => setStyle({ padding: Number(e.target.value) })}
+              onChange={(e) => setStyle({ padding: Number(e.target.value) / 16 })}
             />
           </div>
         </FieldRow>

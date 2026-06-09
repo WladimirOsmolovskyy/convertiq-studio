@@ -366,7 +366,7 @@ export default function VariablesPanel() {
         <SectionTitle>Layout</SectionTitle>
         <SliderField label="Content Width" value={design.layout.maxWidth} onChange={(v) => updateDesign({ layout: { ...design.layout, maxWidth: v } })} min={400} max={1200} step={20} unit="px" />
         <SliderField label="Corner Radius" value={design.layout.borderRadius} onChange={(v) => updateDesign({ layout: { ...design.layout, borderRadius: v } })} min={0} max={30} unit="px" />
-        <SliderField label="Card Padding" value={design.layout.padding} onChange={(v) => updateDesign({ layout: { ...design.layout, padding: v } })} min={0.5} max={4} step={0.25} unit="rem" />
+        <SliderField label="Card Padding" value={Math.round(design.layout.padding * 16)} onChange={(v) => updateDesign({ layout: { ...design.layout, padding: v / 16 } })} min={8} max={64} step={2} unit="px" />
         <SliderField label="Question Gap" value={Math.round(design.layout.questionSpacing * 16)} onChange={(v) => updateDesign({ layout: { ...design.layout, questionSpacing: v / 16 } })} min={8} max={64} step={2} unit="px" />
         <SliderField label="Option Gap" value={design.layout.optionGap ?? 8} onChange={(v) => updateDesign({ layout: { ...design.layout, optionGap: v } })} min={0} max={40} step={2} unit="px" />
       </div>
