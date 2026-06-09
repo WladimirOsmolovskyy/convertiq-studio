@@ -455,6 +455,10 @@ export interface ElementStyles {
   radius?: Styled<number>;
   border?: Styled<string>;
   shadows?: Styled<string>;
+  // Selected/active-state overrides for answer options — fill + border color,
+  // applied only when the option is selected.
+  selectedFill?: Styled<string>;
+  selectedBorder?: Styled<string>;
   // Layout section
   layoutType?: 'stack' | 'grid';
   direction?: 'horizontal' | 'vertical';

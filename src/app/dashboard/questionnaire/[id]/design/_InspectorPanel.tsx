@@ -7,6 +7,7 @@
  *   - Fill    → background
  *   - Radius  → border-radius
  *   - Padding → padding
+ *   - Active state (options only) → selected fill + border color
  *
  * Each field shows an override dot + a ↺ restore button when it's locally
  * set; restoring clears the override so the element inherits its variable /
@@ -69,6 +70,13 @@ export default function InspectorPanel({ selectedElementId }: Props) {
   const fillValue = fillSet ? (override.fill as string) : '';
   const radiusValue = radiusSet ? (override.radius as number) : '';
   const paddingValue = paddingSet ? (override.padding as number) : '';
+
+  // Active/selected-state overrides — only answer options have a selected look.
+  const isOption = selectedElementId === 'radio.option' || selectedElementId === 'checkbox.option';
+  const selFillSet = typeof override.selectedFill === 'string';
+  const selBorderSet = typeof override.selectedBorder === 'string';
+  const selFillValue = selFillSet ? (override.selectedFill as string) : '';
+  const selBorderValue = selBorderSet ? (override.selectedBorder as string) : '';
 
   return (
     <>
@@ -140,6 +148,28 @@ export default function InspectorPanel({ selectedElementId }: Props) {
           </div>
         </FieldRow>
       </div>
+
+      {isOption && (
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <h4 className={styles.sectionTitle}>Active state</h4>
+          </div>
+          <FieldRow label="Fill" overridden={selFillSet} onRestore={() => setStyle({ selectedFill: undefined })}>
+            <FillControl
+              key={`${selectedElementId}:selFill`}
+              value={selFillValue}
+              onChange={(v) => setStyle({ selectedFill: v })}
+            />
+          </FieldRow>
+          <FieldRow label="Border" overridden={selBorderSet} onRestore={() => setStyle({ selectedBorder: undefined })}>
+            <FillControl
+              key={`${selectedElementId}:selBorder`}
+              value={selBorderValue}
+              onChange={(v) => setStyle({ selectedBorder: v })}
+            />
+          </FieldRow>
+        </div>
+      )}
 
       <p className={styles.comingSoon}>
         Size, position, borders, shadows and variable binding are coming soon.

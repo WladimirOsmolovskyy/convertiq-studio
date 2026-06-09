@@ -731,6 +731,10 @@ export default function QuestionnaireRenderer({
                       const optSel = interact(optElementId, () =>
                         isRadio ? handleRadioSelect(opt.id) : handleOptionSelect(opt.id),
                       );
+                      // Active-state overrides (inspector): applied only when selected.
+                      const ov = d.elements?.[optElementId];
+                      const selFill = isSelected && typeof ov?.selectedFill === 'string' ? ov?.selectedFill : undefined;
+                      const selBorder = isSelected && typeof ov?.selectedBorder === 'string' ? ov?.selectedBorder : undefined;
                       return (
                         <button
                           key={opt.id}
@@ -747,6 +751,8 @@ export default function QuestionnaireRenderer({
                             borderRadius: `${d.layout.borderRadius * 0.6}px`,
                             color: d.colors.text,
                             ...elementOverrideStyle(d, optElementId),
+                            ...(selFill ? { background: selFill } : {}),
+                            ...(selBorder ? { border: `1px solid ${selBorder}` } : {}),
                           }}
                         >
                           {!isRadio && (
