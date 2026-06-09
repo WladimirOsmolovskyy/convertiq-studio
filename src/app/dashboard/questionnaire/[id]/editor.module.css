@@ -579,8 +579,6 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  overflow: hidden;
   transition: border-color var(--duration-fast) var(--ease-out);
 }
 .graphNode:hover {
@@ -593,6 +591,7 @@
   padding: 0 0.625rem;
   border-bottom: 1px solid var(--separator);
   background: var(--surface-hover);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 .graphNodeNum {
   width: 20px;
@@ -616,31 +615,37 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.graphNodeType {
-  font-size: 0.625rem;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-.graphPortRow {
-  position: relative;
+.graphOptStrip {
   display: flex;
-  align-items: center;
-  padding: 0 0.625rem;
+  align-items: stretch;
 }
-.graphPortLabel {
+.graphOptCell {
+  position: relative;
   flex: 1;
   min-width: 0;
-  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.25rem;
+  border-left: 1px solid var(--separator);
+}
+.graphOptCell:first-child {
+  border-left: none;
+}
+.graphOptLabel {
+  font-size: 0.625rem;
   color: var(--text-secondary);
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  pointer-events: none;
 }
 .graphPort {
   position: absolute;
-  right: -5px;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 50%;
+  bottom: -5px;
+  transform: translateX(-50%);
   width: 11px;
   height: 11px;
   border-radius: 50%;
@@ -652,7 +657,7 @@
 }
 .graphPort:hover {
   background: var(--accent);
-  transform: translateY(-50%) scale(1.25);
+  transform: translateX(-50%) scale(1.3);
 }
 .graphPort:active {
   cursor: grabbing;
@@ -728,7 +733,7 @@
 }
 .graphPortStatic:hover {
   background: var(--border-hover);
-  transform: translateY(-50%);
+  transform: translateX(-50%);
 }
 
 .graphEdgeBtn {

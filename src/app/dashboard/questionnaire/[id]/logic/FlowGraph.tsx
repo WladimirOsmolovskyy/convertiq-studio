@@ -7,36 +7,35 @@ import { ArrowDown, ArrowUp, Pencil, Trash2, X } from 'lucide-react';
 import styles from '../editor.module.css';
 
 /**
- * Top-to-bottom node graph of the questionnaire flow — the whole logic editor.
+ * Top-down tree graph of the questionnaire flow — the whole logic editor.
  *
- * Predefined geometry (not a free canvas): questions are stacked in order, each
- * a node whose answers are ports on the right edge; branches are SVG edges
- * routed through a right-hand gutter. Positions are derived from the graph each
- * render — nothing is stored.
+ * Predefined geometry (not a free canvas): a spanning tree is laid out top to
+ * bottom; a question's answers are ports along its bottom edge, fanning out
+ * with curved connectors to child questions spread below it. Positions are
+ * derived from the graph each render — nothing is stored.
  *
  * Wiring IS the branch: drag an answer port onto a question to branch to it,
  * onto End to finish, or onto empty space to create a new question and branch
  * to it. Re-dragging a choice answer re-targets its existing branch. Click a
- * connection's pencil to edit the leftover logic (open-question condition,
- * audience tag, precedence) or delete it. Question content stays in the
- * Content tab.
+ * connection's pencil to edit its leftover logic or delete it. Question content
+ * (titles, options) stays in the Content tab.
  */
 
-const LEFT = 24;
-const NODE_W = 248;
-const HEADER_H = 38;
-const ROW_H = 26;
-const PAD_B = 8;
-const GAP = 34;
-const GUTTER = 176;
-const END_H = 46;
-const TOP = 8;
+const NODE_MIN_W = 156;
+const OPT_CELL_W = 66;
+const HEADER_H = 34;
+const OPT_STRIP_H = 30;
+const NODE_H = HEADER_H + OPT_STRIP_H;
+const V_GAP = 66;
+const H_GAP = 30;
+const PAD = 16;
+const END_W = 168;
+const END_H = 44;
 const DRAG_THRESHOLD = 10;
 
 const CHOICE = ['radio', 'checkbox', 'dropdown'];
 const trunc = (s: string, n = 30) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
-/** Operators offered per question type — only those the runtime honors. */
 function operatorOptions(type: QuestionType): { value: BranchOperator; label: string }[] {
   if (CHOICE.includes(type)) {
     return [
@@ -60,8 +59,8 @@ function operatorOptions(type: QuestionType): { value: BranchOperator; label: st
 }
 
 type EdgeKind = 'default' | 'forward' | 'back' | 'end';
-type Port = { key: string; label: string; y: number; optionId: string | null; draggable: boolean };
-type GNode = { id: string; index: number; title: string; type: string; y: number; h: number; ports: Port[] };
+type Port = { key: string; label: string; optionId: string | null; x: number; y: number; draggable: boolean };
+type GNode = { id: string; index: number; title: string; type: string; x: number; y: number; w: number; depth: number; ports: Port[] };
 type GEdge = { id: string; d: string; kind: EdgeKind; fromQ: string; toQ: string | null; mid?: { x: number; y: number } };
 type Pending = { sourceQuestionId: string; optionId: string | null; fromX: number; fromY: number };
 type Selected = { branchId: string; x: number; y: number };
@@ -80,89 +79,209 @@ const ARROW_CLASS: Record<EdgeKind, string> = {
 };
 const EDGE_KINDS: EdgeKind[] = ['default', 'forward', 'back', 'end'];
 
+function curvePath(sx: number, sy: number, tx: number, ty: number, kind: EdgeKind): string {
+  if (kind === 'back') {
+    const bow = 64 + Math.abs(tx - sx) * 0.12;
+    return `M ${sx} ${sy} C ${sx + bow} ${sy} ${tx + bow} ${ty} ${tx} ${ty}`;
+  }
+  const dy = Math.max(24, Math.abs(ty - sy) * 0.45);
+  return `M ${sx} ${sy} C ${sx} ${sy + dy} ${tx} ${ty - dy} ${tx} ${ty}`;
+}
+
+type TreeNode = { id: string; depth: number; w: number; x: number; children: TreeNode[] };
+
 function buildLayout(questions: Question[], branches: QuestionBranch[]) {
-  const nodes: GNode[] = [];
-  let y = TOP;
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-    const isChoice = CHOICE.includes(q.type);
-    const hasOpts = isChoice && q.options.length > 0;
-    const rowCount = hasOpts ? q.options.length : 1;
-    const h = HEADER_H + rowCount * ROW_H + PAD_B;
-    const ports: Port[] = [];
-    if (hasOpts) {
-      q.options.forEach((opt, k) => {
-        ports.push({ key: opt.id, label: opt.label, y: y + HEADER_H + k * ROW_H + ROW_H / 2, optionId: opt.id, draggable: true });
-      });
-    } else {
-      ports.push({
-        key: 'answer',
-        label: isChoice ? 'no options yet' : 'answer',
-        y: y + HEADER_H + ROW_H / 2,
-        optionId: null,
-        draggable: !isChoice,
-      });
+  const meta = new Map(questions.map((q, index) => [q.id, { q, index }]));
+  const branchesByQ = new Map<string, QuestionBranch[]>();
+  for (const b of branches) {
+    const list = branchesByQ.get(b.question_id) ?? [];
+    list.push(b);
+    branchesByQ.set(b.question_id, list);
+  }
+  for (const list of branchesByQ.values()) list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  const nodeWidth = (q: Question) => {
+    const n = CHOICE.includes(q.type) && q.options.length ? q.options.length : 1;
+    return Math.max(NODE_MIN_W, n * OPT_CELL_W);
+  };
+
+  // Children of a question = distinct branch targets (in order) then the
+  // default next question, deduped. Used to build the spanning tree.
+  const childList = (qId: string) => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const b of branchesByQ.get(qId) ?? []) {
+      if (b.is_end) continue;
+      const t = b.target_question_id;
+      if (t && meta.has(t) && t !== qId && !seen.has(t)) {
+        seen.add(t);
+        out.push(t);
+      }
     }
-    nodes.push({ id: q.id, index: i, title: q.title, type: q.type, y, h, ports });
-    y += h + GAP;
+    const m = meta.get(qId);
+    const nextId = m ? questions[m.index + 1]?.id : undefined;
+    if (nextId && !seen.has(nextId)) out.push(nextId);
+    return out;
+  };
+
+  // Breadth-first so a fork's targets are all claimed as siblings at the next
+  // level (depth-first would let the default-next chain steal them into a
+  // single vertical line, collapsing the fan-out).
+  const placed = new Map<string, TreeNode>();
+  const place = (qId: string, depth: number): TreeNode => {
+    const tn: TreeNode = { id: qId, depth, w: nodeWidth(meta.get(qId)!.q), x: 0, children: [] };
+    placed.set(qId, tn);
+    return tn;
+  };
+  const grow = (root: TreeNode) => {
+    const queue: TreeNode[] = [root];
+    while (queue.length) {
+      const tn = queue.shift()!;
+      for (const cId of childList(tn.id)) {
+        if (placed.has(cId) || !meta.has(cId)) continue;
+        const cn = place(cId, tn.depth + 1);
+        tn.children.push(cn);
+        queue.push(cn);
+      }
+    }
+  };
+
+  const roots: TreeNode[] = [];
+  if (questions[0]) {
+    const r = place(questions[0].id, 0);
+    roots.push(r);
+    grow(r);
+  }
+  for (const q of questions) {
+    if (!placed.has(q.id)) {
+      const r = place(q.id, 0);
+      roots.push(r);
+      grow(r);
+    }
   }
 
-  const endY = y;
+  let cursorX = PAD;
+  const assignX = (tn: TreeNode) => {
+    if (tn.children.length === 0) {
+      tn.x = cursorX;
+      cursorX += tn.w + H_GAP;
+      return;
+    }
+    for (const c of tn.children) assignX(c);
+    const f = tn.children[0];
+    const l = tn.children[tn.children.length - 1];
+    tn.x = (f.x + l.x + l.w) / 2 - tn.w / 2;
+  };
+  for (const r of roots) if (r) assignX(r);
+
+  let minX = Infinity;
+  for (const tn of placed.values()) minX = Math.min(minX, tn.x);
+  const offset = Number.isFinite(minX) && minX < PAD ? PAD - minX : 0;
+  const yOf = (depth: number) => PAD + depth * (NODE_H + V_GAP);
+
+  const nodes: GNode[] = [];
+  let maxRight = 0;
+  let maxDepth = 0;
+  for (const [qId, tn] of placed) {
+    const m = meta.get(qId)!;
+    const q = m.q;
+    const isChoice = CHOICE.includes(q.type);
+    const opts = isChoice && q.options.length ? q.options : null;
+    const n = opts ? opts.length : 1;
+    const x = tn.x + offset;
+    const y = yOf(tn.depth);
+    const ports: Port[] = [];
+    for (let k = 0; k < n; k++) {
+      const px = x + ((k + 0.5) / n) * tn.w;
+      const py = y + NODE_H;
+      if (opts) ports.push({ key: opts[k].id, label: opts[k].label, optionId: opts[k].id, x: px, y: py, draggable: true });
+      else ports.push({ key: 'answer', label: isChoice ? 'no options' : 'answer', optionId: null, x: px, y: py, draggable: !isChoice });
+    }
+    nodes.push({ id: qId, index: m.index, title: q.title, type: q.type, x, y, w: tn.w, depth: tn.depth, ports });
+    maxRight = Math.max(maxRight, x + tn.w);
+    maxDepth = Math.max(maxDepth, tn.depth);
+  }
+
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const portX = LEFT + NODE_W;
-  const centerX = LEFT + NODE_W / 2;
-  const endCenterY = endY + END_H / 2;
+  const rootNode = roots[0] ? byId.get(roots[0].id) : undefined;
+  const endY = yOf(maxDepth + 1);
+  const endX = rootNode ? rootNode.x + rootNode.w / 2 - END_W / 2 : PAD;
+  const endTop = { x: endX + END_W / 2, y: endY };
+
   const edges: GEdge[] = [];
 
-  for (let i = 0; i < nodes.length; i++) {
-    const n = nodes[i];
-    const toY = i < nodes.length - 1 ? nodes[i + 1].y : endY;
-    edges.push({
-      id: `def-${n.id}`,
-      d: `M ${centerX} ${n.y + n.h} L ${centerX} ${toY}`,
-      kind: 'default',
-      fromQ: n.id,
-      toQ: i < nodes.length - 1 ? nodes[i + 1].id : null,
-    });
+  // Faint default fall-through edges (center bottom → next question, or → End
+  // for the last question).
+  for (const node of nodes) {
+    const sx = node.x + node.w / 2;
+    const sy = node.y + NODE_H;
+    const nextQ = questions[node.index + 1];
+    if (nextQ) {
+      const tgt = byId.get(nextQ.id);
+      if (!tgt) continue;
+      const back = tgt.depth <= node.depth;
+      edges.push({
+        id: `def-${node.id}`,
+        d: curvePath(sx, sy, tgt.x + tgt.w / 2, tgt.y, back ? 'back' : 'default'),
+        kind: 'default',
+        fromQ: node.id,
+        toQ: tgt.id,
+      });
+    } else {
+      edges.push({
+        id: `def-${node.id}`,
+        d: curvePath(sx, sy, endTop.x, endTop.y, 'default'),
+        kind: 'default',
+        fromQ: node.id,
+        toQ: null,
+      });
+    }
   }
 
+  // Branch edges from answer ports.
   for (const b of branches) {
     const src = byId.get(b.question_id);
     if (!src) continue;
-    let py = src.ports[0]?.y ?? src.y + src.h / 2;
-    if (b.condition.field === 'option') {
-      const p = src.ports.find((pp) => pp.optionId === b.condition.value);
-      if (p) py = p.y;
-    }
+    const port = b.condition.field === 'option' ? src.ports.find((p) => p.optionId === b.condition.value) : src.ports[0];
+    const sx = port ? port.x : src.x + src.w / 2;
+    const sy = port ? port.y : src.y + NODE_H;
 
+    let tx: number;
     let ty: number;
     let kind: EdgeKind;
     let toQ: string | null;
     if (b.is_end) {
-      ty = endCenterY;
+      tx = endTop.x;
+      ty = endTop.y;
       kind = 'end';
       toQ = null;
     } else if (b.target_question_id && byId.has(b.target_question_id)) {
       const tgt = byId.get(b.target_question_id)!;
-      ty = tgt.y + tgt.h / 2;
-      kind = tgt.index > src.index ? 'forward' : 'back';
+      tx = tgt.x + tgt.w / 2;
+      ty = tgt.y;
+      kind = tgt.depth > src.depth ? 'forward' : 'back';
       toQ = tgt.id;
     } else {
       continue;
     }
 
-    const bow = Math.min(GUTTER - 8, 44 + Math.abs(ty - py) * 0.22);
     edges.push({
       id: b.id,
-      d: `M ${portX} ${py} C ${portX + bow} ${py}, ${portX + bow} ${ty}, ${portX} ${ty}`,
+      d: curvePath(sx, sy, tx, ty, kind),
       kind,
       fromQ: b.question_id,
       toQ,
-      mid: { x: portX + bow * 0.62, y: (py + ty) / 2 },
+      mid: { x: (sx + tx) / 2 + (kind === 'back' ? 44 : 0), y: (sy + ty) / 2 },
     });
   }
 
-  return { nodes, edges, width: LEFT + NODE_W + GUTTER, height: endY + END_H + TOP, endY };
+  return {
+    nodes,
+    edges,
+    endNode: { x: endX, y: endY, w: END_W, h: END_H },
+    width: Math.max(maxRight, endX + END_W) + PAD,
+    height: endY + END_H + PAD,
+  };
 }
 
 export default function FlowGraph({
@@ -177,7 +296,7 @@ export default function FlowGraph({
   const connectBranch = useQuestionnaireStore((s) => s.connectBranch);
   const addQuestion = useQuestionnaireStore((s) => s.addQuestion);
 
-  const { nodes, edges, width, height, endY } = useMemo(
+  const { nodes, edges, endNode, width, height } = useMemo(
     () => buildLayout(questions, branches),
     [questions, branches],
   );
@@ -248,11 +367,10 @@ export default function FlowGraph({
     };
   }, [pending, connectBranch, addQuestion]);
 
-  const startWire = (e: React.PointerEvent, sourceQuestionId: string, optionId: string | null, fromY: number) => {
+  const startWire = (e: React.PointerEvent, sourceQuestionId: string, optionId: string | null, fromX: number, fromY: number) => {
     e.preventDefault();
     e.stopPropagation();
     setSelected(null);
-    const fromX = LEFT + NODE_W;
     setPending({ sourceQuestionId, optionId, fromX, fromY });
     setCursor({ x: fromX, y: fromY });
   };
@@ -263,16 +381,7 @@ export default function FlowGraph({
         <svg className={styles.graphEdges} width={width} height={height} aria-hidden>
           <defs>
             {EDGE_KINDS.map((k) => (
-              <marker
-                key={k}
-                id={`gm-${k}`}
-                viewBox="0 0 8 8"
-                refX="6.5"
-                refY="4"
-                markerWidth="6"
-                markerHeight="6"
-                orient="auto"
-              >
+              <marker key={k} id={`gm-${k}`} viewBox="0 0 8 8" refX="6.5" refY="4" markerWidth="6" markerHeight="6" orient="auto">
                 <path d="M0,0 L8,4 L0,8 z" className={ARROW_CLASS[k]} />
               </marker>
             ))}
@@ -292,7 +401,7 @@ export default function FlowGraph({
           })}
           {pending && (
             <path
-              d={`M ${pending.fromX} ${pending.fromY} C ${pending.fromX + 60} ${pending.fromY}, ${cursor.x - 60} ${cursor.y}, ${cursor.x} ${cursor.y}`}
+              d={`M ${pending.fromX} ${pending.fromY} C ${pending.fromX} ${pending.fromY + 50} ${cursor.x} ${cursor.y - 50} ${cursor.x} ${cursor.y}`}
               fill="none"
               className={styles.graphEdgeWiring}
             />
@@ -304,31 +413,32 @@ export default function FlowGraph({
             key={n.id}
             data-qid={n.id}
             className={`${styles.graphNode} ${hoverId === n.id ? styles.graphNodeDrop : ''}`}
-            style={{ left: LEFT, top: n.y, width: NODE_W, opacity: isDim(n.id) ? 0.3 : 1 }}
+            style={{ left: n.x, top: n.y, width: n.w, height: NODE_H, opacity: isDim(n.id) ? 0.3 : 1 }}
             title={n.title}
           >
             <div className={styles.graphNodeHead} style={{ height: HEADER_H }}>
               <span className={styles.graphNodeNum}>{n.index + 1}</span>
-              <span className={styles.graphNodeTitle}>{trunc(n.title, 26)}</span>
-              <span className={styles.graphNodeType}>{n.type}</span>
+              <span className={styles.graphNodeTitle}>{trunc(n.title, 22)}</span>
             </div>
-            {n.ports.map((p) => (
-              <div key={p.key} className={styles.graphPortRow} style={{ height: ROW_H }}>
-                <span className={styles.graphPortLabel}>{trunc(p.label, 24)}</span>
-                <span
-                  className={`${styles.graphPort} ${p.draggable ? '' : styles.graphPortStatic}`}
-                  title={p.draggable ? 'Drag to connect' : undefined}
-                  onPointerDown={p.draggable ? (e) => startWire(e, n.id, p.optionId, p.y) : undefined}
-                />
-              </div>
-            ))}
+            <div className={styles.graphOptStrip} style={{ height: OPT_STRIP_H }}>
+              {n.ports.map((p) => (
+                <div key={p.key} className={styles.graphOptCell} title={p.label}>
+                  <span className={styles.graphOptLabel}>{trunc(p.label, 9)}</span>
+                  <span
+                    className={`${styles.graphPort} ${p.draggable ? '' : styles.graphPortStatic}`}
+                    title={p.draggable ? 'Drag to connect' : undefined}
+                    onPointerDown={p.draggable ? (e) => startWire(e, n.id, p.optionId, p.x, p.y) : undefined}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         ))}
 
         <div
           data-endnode=""
           className={`${styles.graphEndNode} ${hoverId === '__end__' ? styles.graphNodeDrop : ''}`}
-          style={{ left: LEFT, top: endY, width: NODE_W, height: END_H }}
+          style={{ left: endNode.x, top: endNode.y, width: endNode.w, height: endNode.h }}
         >
           Results / End
         </div>
