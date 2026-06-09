@@ -16,6 +16,7 @@ import {
   X,
   Plus,
   FileText,
+  Flag,
 } from 'lucide-react';
 import styles from '../editor.module.css';
 
@@ -35,8 +36,18 @@ const QUESTION_TYPES: { type: QuestionType; label: string; icon: ReactNode }[] =
 const hasOptions = (type: QuestionType) => ['radio', 'checkbox', 'dropdown'].includes(type);
 
 export default function ContentEditor() {
-  const { questions, addQuestion, updateQuestion, removeQuestion, addOption, updateOption, removeOption } =
-    useQuestionnaireStore();
+  const {
+    questions,
+    addQuestion,
+    updateQuestion,
+    removeQuestion,
+    addOption,
+    updateOption,
+    toggleOptionRedFlag,
+    removeOption,
+    scoringRules,
+    updateScoringRule,
+  } = useQuestionnaireStore();
 
   return (
     <div className={styles.editorPanel}>
@@ -59,7 +70,9 @@ export default function ContentEditor() {
           </div>
         )}
 
-        {questions.map((q, idx) => (
+        {questions.map((q, idx) => {
+          const rule = scoringRules.find((r) => r.question_id === q.id);
+          return (
           <div key={q.id} className={styles.questionCard}>
             <div className={styles.questionCardHeader}>
               <div className={styles.dragHandle} aria-hidden>
@@ -116,6 +129,40 @@ export default function ContentEditor() {
                         onChange={(e) => updateOption(q.id, opt.id, e.target.value)}
                         placeholder="Option text..."
                       />
+                      <input
+                        type="number"
+                        className={styles.scoreInput}
+                        value={rule?.option_scores?.[opt.id] ?? 0}
+                        onChange={(e) =>
+                          updateScoringRule(q.id, {
+                            type: 'fixed',
+                            option_scores: {
+                              ...(rule?.option_scores || {}),
+                              [opt.id]: Number(e.target.value),
+                            },
+                          })
+                        }
+                        title="Points awarded if this option is selected"
+                        aria-label="Points for option"
+                      />
+                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>pts</span>
+                      <button
+                        className={styles.removeBtn}
+                        onClick={() => toggleOptionRedFlag(q.id, opt.id)}
+                        title={opt.is_red_flag ? 'Red flag — click to clear' : 'Mark as red flag'}
+                        aria-label={opt.is_red_flag ? 'Clear red flag' : 'Mark as red flag'}
+                        aria-pressed={!!opt.is_red_flag}
+                        style={{
+                          color: opt.is_red_flag ? 'var(--danger, #ff3b30)' : 'var(--text-muted)',
+                          background: opt.is_red_flag ? 'rgba(255, 59, 48, 0.1)' : undefined,
+                        }}
+                      >
+                        <Flag
+                          size={14}
+                          strokeWidth={opt.is_red_flag ? 2.25 : 1.75}
+                          fill={opt.is_red_flag ? 'currentColor' : 'none'}
+                        />
+                      </button>
                       <button
                         className={styles.removeBtn}
                         onClick={() => removeOption(q.id, opt.id)}
@@ -151,6 +198,94 @@ export default function ContentEditor() {
                   ))}
                 </div>
               )}
+
+              {/* ─── Scoring for non-options questions ──────────── */}
+              {!hasOptions(q.type) && (
+                <div
+                  style={{
+                    marginTop: '1rem',
+                    paddingTop: '0.875rem',
+                    borderTop: '1px solid var(--separator)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      Scoring
+                    </span>
+                    {(q.type === 'text' || q.type === 'textarea') && (
+                      <div style={{ display: 'flex', gap: '0.375rem' }}>
+                        <button
+                          className={`btn btn-sm ${rule?.type === 'fixed' ? 'btn-primary' : 'btn-ghost'}`}
+                          onClick={() => updateScoringRule(q.id, { type: 'fixed' })}
+                        >
+                          Fixed
+                        </button>
+                        <button
+                          className={`btn btn-sm ${rule?.type === 'ai' ? 'btn-primary' : 'btn-ghost'}`}
+                          onClick={() => updateScoringRule(q.id, { type: 'ai' })}
+                        >
+                          AI
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {rule?.type === 'ai' && (q.type === 'text' || q.type === 'textarea') ? (
+                    <>
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <div style={{ flex: 1 }}>
+                          <label className="input-label">Min Score</label>
+                          <input
+                            type="number"
+                            className="input"
+                            value={rule.ai_score_min}
+                            onChange={(e) => updateScoringRule(q.id, { ai_score_min: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label className="input-label">Max Score</label>
+                          <input
+                            type="number"
+                            className="input"
+                            value={rule.ai_score_max}
+                            onChange={(e) => updateScoringRule(q.id, { ai_score_max: Number(e.target.value) })}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="input-label">AI Scoring Criteria</label>
+                        <textarea
+                          className="input"
+                          rows={3}
+                          value={rule.ai_prompt || ''}
+                          onChange={(e) => updateScoringRule(q.id, { ai_prompt: e.target.value })}
+                          placeholder="Describe what makes a good answer. E.g.: 'Score higher if the answer demonstrates specific technical knowledge.'"
+                          style={{ resize: 'vertical' }}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Points for any answer:</span>
+                      <input
+                        type="number"
+                        className={styles.scoreInput}
+                        value={rule?.option_scores?.['_any'] ?? 0}
+                        onChange={(e) =>
+                          updateScoringRule(q.id, {
+                            type: 'fixed',
+                            option_scores: { _any: Number(e.target.value) },
+                          })
+                        }
+                      />
+                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>pts</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className={styles.questionCardFooter}>
@@ -168,7 +303,8 @@ export default function ContentEditor() {
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
 
         <div className={styles.addQuestionArea}>
           <p style={{

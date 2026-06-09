@@ -32,6 +32,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env*.example
+
+# per-worktree agent catch-up note, written by `ciq-s sync`
+SYNC_NOTES.md
 
 # vercel
 .vercel

@@ -123,9 +123,9 @@ export default function SidebarInner({
       match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/logic/.test(p),
     },
     {
-      label: 'Scoring',
-      path: qTab('scoring'),
-      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/scoring/.test(p),
+      label: 'Result',
+      path: qTab('result'),
+      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/result/.test(p),
     },
     {
       label: 'Design',
@@ -136,6 +136,11 @@ export default function SidebarInner({
       label: 'Settings',
       path: qTab('settings'),
       match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/settings/.test(p),
+    },
+    {
+      label: 'Integrations',
+      path: qTab('integrations'),
+      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/integrations/.test(p),
     },
     {
       label: 'Preview',
@@ -150,6 +155,11 @@ export default function SidebarInner({
       match: (p) =>
         p.startsWith('/dashboard/leads') ||
         /^\/dashboard\/questionnaire\/[^/]+\/leads/.test(p),
+    },
+    {
+      label: 'Audiences',
+      path: qTab('audiences'),
+      match: (p) => /^\/dashboard\/questionnaire\/[^/]+\/audiences/.test(p),
     },
   ];
 
@@ -192,7 +202,12 @@ export default function SidebarInner({
     {
       title: 'Tools',
       items: [
-        { label: 'All Tools', icon: <LayoutGrid {...ip} />, path: '/dashboard/tools' },
+        {
+          label: 'All Tools',
+          icon: <LayoutGrid {...ip} />,
+          path: '/dashboard/tools',
+          match: (p) => p === '/dashboard/tools' || p.startsWith('/dashboard/tools/'),
+        },
       ],
     },
     {

@@ -1,0 +1,1516 @@
+/* ─── Result editor 3-column shell ─────────────────────────────── */
+.editor {
+  display: grid;
+  grid-template-columns: 240px 1fr 320px;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+}
+
+/* ─── Left rail: page list ──────────────────────────────────────── */
+.pageList {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-elevated, var(--bg-secondary));
+  border-right: 1px solid var(--separator);
+  min-height: 0;
+}
+
+.pageListHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--separator);
+}
+
+.pageListHeader h3 {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  margin: 0;
+}
+
+.pageListBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.pageListItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out);
+  text-align: left;
+}
+.pageListItem:hover {
+  border-color: var(--border-hover);
+}
+.pageListItemActive {
+  border-color: var(--accent);
+  background: var(--accent-muted, rgba(0, 122, 255, 0.06));
+}
+.pageListItemName {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.pageListItemRange {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}
+
+.pageListEmpty {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+/* ─── Resizable rail wrappers ──────────────────────────────────── */
+.railWrap {
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+.railWrap > .leftRail,
+.railWrap > .inspector {
+  flex: 1;
+}
+
+/** Handles stick out a few pixels beyond the rail edge so users have a
+ *  generous hit area without a visible bar on hover-less. */
+.resizeHandleRight,
+.resizeHandleLeft {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 20;
+  background: transparent;
+  transition: background-color 0.15s var(--ease-out);
+}
+.resizeHandleRight { right: -3px; }
+.resizeHandleLeft { left: -3px; }
+.resizeHandleRight:hover,
+.resizeHandleLeft:hover,
+.resizeHandleRight:active,
+.resizeHandleLeft:active {
+  background: var(--accent);
+}
+
+/* ─── Left rail: tabs + search + active-tab content ────────────── */
+.leftRail {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-elevated, var(--bg-secondary));
+  border-right: 1px solid var(--separator);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tabStrip {
+  display: flex;
+  gap: 4px;
+  padding: 10px 10px 6px;
+  flex-shrink: 0;
+}
+.tab {
+  flex: 1;
+  padding: 7px 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  text-align: center;
+  transition: color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+.tab:hover {
+  color: var(--text);
+}
+.tabActive {
+  color: var(--text);
+  background: var(--fill-quaternary);
+  border-color: var(--separator);
+}
+
+.searchRow {
+  display: flex;
+  align-items: center;
+  padding: 4px 10px 10px;
+  position: relative;
+  flex-shrink: 0;
+}
+.searchIcon {
+  position: absolute;
+  left: 21px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.searchInput {
+  flex: 1;
+  width: 100%;
+  padding: 6px 10px 6px 30px;
+  background: var(--fill-quaternary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: 0.8125rem;
+  box-sizing: border-box;
+}
+.searchInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg);
+}
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+.searchInput::-webkit-search-cancel-button {
+  cursor: pointer;
+}
+
+.leftRailContent {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.addPageBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px;
+  margin-top: 6px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.addPageBtn:hover {
+  background: var(--fill-quaternary);
+  color: var(--text);
+}
+
+/* ─── Layers panel ─────────────────────────────────────────────── */
+.layersPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  background: var(--surface-elevated, var(--bg-secondary));
+}
+
+.layersHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem 0.625rem;
+}
+.layersHeader h3 {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: var(--text);
+  margin: 0;
+}
+
+.layersBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0.25rem 0.5rem;
+}
+
+.layerRow {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  min-height: 26px;
+  position: relative;
+}
+.layerRow:hover {
+  background: var(--fill-quaternary);
+  color: var(--text);
+}
+.layerRowSelected {
+  background: var(--accent-muted, rgba(0, 122, 255, 0.1));
+  color: var(--accent);
+}
+.layerRowSelected:hover {
+  background: var(--accent-muted, rgba(0, 122, 255, 0.1));
+}
+/** Wrapper hint: hovering a frame row during drag indicates the source
+ *  will become its first child. */
+.layerRowDropFrame > .layerRow {
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-muted, rgba(0, 122, 255, 0.08));
+}
+
+.layerIcon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.layerLabel {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layerActions {
+  display: none;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0;
+}
+.layerRow:hover .layerActions,
+.layerRowSelected .layerActions {
+  display: flex;
+}
+
+.layerActionBtn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.layerActionBtn:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+}
+.layerActionBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.moveMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 11;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  min-width: 180px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.moveMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.moveMenuItem:hover {
+  background: var(--fill-quaternary);
+}
+
+/* ─── Center: canvas ────────────────────────────────────────────── */
+.canvas {
+  position: relative;
+  overflow: auto;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.canvasToolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid var(--separator);
+  background: var(--surface-elevated, var(--bg-secondary));
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.canvasStage {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+  min-height: 0;
+}
+
+/** Wrapper that captures clicks on individual nodes. Uses outline
+ *  (not border) so it doesn't reflow the page when toggled. */
+.nodeHit {
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+  cursor: pointer;
+  position: relative;
+}
+.nodeHit:hover {
+  outline-color: var(--accent-hover, rgba(0, 122, 255, 0.4));
+}
+.nodeHitSelected {
+  outline: 2px solid var(--accent) !important;
+}
+
+.canvasEmpty {
+  margin: auto;
+  padding: 3rem 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+}
+
+/* ─── Add-block menu ────────────────────────────────────────────── */
+.blockMenu {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.375rem;
+  padding: 0.5rem;
+}
+.blockMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.blockMenuItem:hover {
+  background: var(--fill-quaternary);
+}
+
+/* ─── Right rail: inspector ─────────────────────────────────────── */
+.inspector {
+  background: var(--surface-elevated, var(--bg-secondary));
+  border-left: 1px solid var(--separator);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.inspectorSection {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--separator);
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.inspectorSectionTitle {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.inspectorField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.inspectorFieldLabel {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  letter-spacing: 0.005em;
+}
+.inspectorFieldRow {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.inspectorFieldRow > * { flex: 1; }
+.inspectorNumberInput {
+  width: 100%;
+  padding: 0.3125rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  box-sizing: border-box;
+}
+.inspectorNumberInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.segmented {
+  display: flex;
+  background: var(--fill-quaternary);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  gap: 2px;
+}
+.segmentedBtn {
+  flex: 1;
+  padding: 0.3125rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: center;
+}
+.segmentedBtnActive {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ─── Spans editor (text node content with chips) ──────────────── */
+.spansList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.spansFieldRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.375rem;
+}
+.addVarWrap {
+  position: relative;
+  flex-shrink: 0;
+  /** Nudge the + button down so it sits inline with the first line of
+   *  text in the textarea, not at the very top of the textarea box. */
+  padding-top: 5px;
+}
+/** Accent-tinted "+" button. Matches the "+ Content" affordance from
+ *  the design tool reference: small, accent-colored, hover-darkens. */
+.addVarBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+.addVarBtn:hover {
+  background: var(--accent-muted, rgba(0, 122, 255, 0.12));
+}
+/** Outer field container that holds textarea + chips as one visual unit.
+ *  Acts like an input box; the inner textarea is borderless so the field
+ *  reads as a single bordered surface. */
+.spansField {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.4375rem 0.5rem;
+  min-width: 0;
+}
+.spansField:focus-within {
+  border-color: var(--accent);
+}
+.spansTextarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.8125rem;
+  resize: vertical;
+  font-family: inherit;
+  min-height: 40px;
+  padding: 0;
+  box-sizing: border-box;
+}
+.spansTextarea:focus {
+  outline: none;
+}
+.spansChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.varChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.5rem 0.3125rem 0.375rem;
+  background: var(--accent);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+}
+.varChipIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  color: white;
+  flex-shrink: 0;
+}
+.varChipLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.varChipRemove {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 4px;
+  margin-left: 2px;
+}
+.varChipRemove:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* ─── Variable picker dropdown ─────────────────────────────────── */
+.varPicker {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  /* Rendered via a portal above a full-screen click-away overlay (z-index
+     1000); must sit above it so item clicks land instead of closing. */
+  z-index: 1001;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  width: 260px;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.varPickerSearch {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  border-bottom: 1px solid var(--separator);
+  color: var(--text-muted);
+}
+.varPickerSearch input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 0.8125rem;
+  padding: 0;
+}
+.varPickerSearch input:focus { outline: none; }
+.varPickerSearch input::placeholder { color: var(--text-muted); }
+.varPickerSearch input::-webkit-search-cancel-button { cursor: pointer; }
+
+.varPickerBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+.varPickerSection {
+  padding: 0.25rem 0;
+}
+.varPickerSection + .varPickerSection {
+  border-top: 1px solid var(--separator);
+  margin-top: 0.25rem;
+  padding-top: 0.375rem;
+}
+.varPickerSectionTitle {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  padding: 0.25rem 0.75rem;
+}
+.varPickerItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4375rem 0.75rem;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+.varPickerItem:hover {
+  background: var(--fill-quaternary);
+}
+.varPickerItemIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: var(--accent-muted, rgba(0, 122, 255, 0.12));
+  color: var(--accent);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+.varPickerItemLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.varPickerItemKey {
+  font-size: 0.6875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.varPickerEmpty {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* ─── Image dropzone (inspector) ─────────────────────────────────── */
+.imageDropzone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 120px;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
+}
+.imageDropzone:hover,
+.imageDropzoneOver {
+  border-color: var(--accent);
+  background: var(--fill-quaternary);
+}
+.imageDropzoneHasImage {
+  border-style: solid;
+  background: var(--surface);
+}
+.imageDropzonePreview {
+  display: block;
+  max-width: 100%;
+  max-height: 200px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+.imageDropzoneEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1rem;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+.imageDropzoneHint {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+.imageDropzoneOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.imageDropzoneError {
+  margin-top: 4px;
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  color: var(--error);
+  background: var(--error-muted, rgba(255, 59, 48, 0.08));
+  border-radius: var(--radius-sm);
+}
+.spin {
+  animation: result-spin 0.9s linear infinite;
+}
+@keyframes result-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Framer-style inspector sections ──────────────────────────── */
+
+/** Section card. Header is a button (toggles open). Body inset 0. */
+.section {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--separator);
+}
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0.875rem 1rem 0.5rem;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.sectionTitle {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+.sectionToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+.sectionHeader:hover .sectionToggle {
+  color: var(--text);
+  background: var(--fill-quaternary);
+}
+.sectionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.125rem 1rem 0.875rem;
+}
+
+/* ─── Property row (label on left, value on right) ──────────────── */
+.propRow {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 28px;
+}
+.propLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.propLeadPlus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+  border-radius: 50%;
+}
+.propValue {
+  display: flex;
+  min-width: 0;
+}
+.propValue > * {
+  flex: 1;
+  min-width: 0;
+}
+.propPlaceholder {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 0.5rem 0;
+  font-style: italic;
+}
+.dimHint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+.toLabel {
+  flex: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+
+/* ─── Full-width inputs used inside prop values ─────────────────── */
+.fwInput {
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  box-sizing: border-box;
+}
+.fwInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.fwInput:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ─── Segmented control (text labels) ───────────────────────────── */
+.segCtl {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--fill-quaternary);
+  border-radius: var(--radius-md);
+  width: 100%;
+}
+.segCtlBtn {
+  flex: 1;
+  padding: 0.3125rem 0.375rem;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.segCtlBtnActive {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ─── Icon-only segmented control ───────────────────────────────── */
+.iconSeg {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--fill-quaternary);
+  border-radius: var(--radius-md);
+  width: 100%;
+}
+.iconSegBtn {
+  flex: 1;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.iconSegBtn:hover {
+  color: var(--text);
+}
+.iconSegBtnActive {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ─── Dropdown stub (Framer-style chip) ─────────────────────────── */
+.dropdownStub {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 0.375rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.dropdownStub:hover {
+  border-color: var(--border-hover, var(--accent));
+}
+.dropdownStubSelect {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ─── Number + slider combo ─────────────────────────────────────── */
+.numberSlider {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 0.375rem;
+  align-items: center;
+  width: 100%;
+}
+.numberSliderNum {
+  padding: 0.375rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  box-sizing: border-box;
+  width: 100%;
+}
+.numberSliderNum:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.numberSliderRange {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* ─── Number stepper (number + −/+ buttons) ────────────────────── */
+.numberStepper {
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  gap: 0.375rem;
+  align-items: stretch;
+  width: 100%;
+}
+.numberStepperBtns {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.numberStepperBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+.numberStepperBtn:hover { color: var(--text); }
+.numberStepperSep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+}
+
+/* ─── Color field (swatch + text input) ─────────────────────────── */
+.colorField {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 3px 6px 3px 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.colorField:focus-within {
+  border-color: var(--accent);
+}
+.colorSwatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--fill-quaternary);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.colorFieldInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.8125rem;
+  padding: 0.25rem 0;
+  min-width: 0;
+}
+.colorFieldInput:focus { outline: none; }
+.colorFieldInput::placeholder { color: var(--text-muted); }
+
+/* ─── Size row (value + mode selector) ──────────────────────────── */
+.sizeRow {
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  gap: 0.375rem;
+  width: 100%;
+}
+.sizeRowValue {
+  width: 100%;
+}
+.sizeRowMode {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.sizeRowMode select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ─── Padding / Radius controls ────────────────────────────────── */
+.paddingCtl {
+  display: grid;
+  grid-template-columns: 1fr 30px 30px;
+  gap: 0.25rem;
+  width: 100%;
+}
+.paddingCtlGrid {
+  /* Per-side padding: 2×2 inputs so they stay usable in a narrow rail
+     instead of collapsing into one cramped row. */
+  display: grid;
+  grid-template-columns: 1fr 1fr 30px;
+  gap: 0.25rem;
+  width: 100%;
+  align-items: center;
+}
+/* Link toggle spans both input rows on the right. */
+.paddingCtlGrid .paddingLinkBtn {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+}
+/* ─── Scrubbable number field (drag up/down to change) ─────────── */
+.scrubField {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-sizing: border-box;
+}
+.scrubField:focus-within {
+  border-color: var(--accent);
+}
+.scrubInput {
+  width: 100%;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  padding-right: 15px; /* room for the chevron steppers */
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 0.8125rem;
+  box-sizing: border-box;
+  cursor: ns-resize; /* affordance: drag to scrub */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.scrubInput:focus {
+  outline: none;
+  cursor: text;
+}
+.scrubInput::-webkit-inner-spin-button,
+.scrubInput::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Small custom up/down steppers, stacked at the right edge. */
+.scrubArrows {
+  position: absolute;
+  right: 2px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.scrubArrowBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 10px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.scrubArrowBtn:hover {
+  color: var(--text);
+}
+.paddingLinkBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  width: 100%;
+  height: 28px;
+}
+.paddingLinkBtn:hover {
+  color: var(--text);
+}
+.paddingLinkBtnActive {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--text-secondary);
+}
+
+/* ─── Top alignment icon strip ─────────────────────────────────── */
+.alignRow {
+  display: flex;
+  gap: 2px;
+  padding: 0.625rem 0.875rem 0.375rem;
+  border-bottom: 1px solid var(--separator);
+}
+.alignBtn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.alignBtn:hover {
+  background: var(--fill-quaternary);
+  color: var(--text);
+}
+
+/* ─── Variable reference list ───────────────────────────────────── */
+.varGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+.varGroupTitle {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.varListChip {
+  display: inline-block;
+  padding: 0.1875rem 0.375rem;
+  background: var(--fill-quaternary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 0.6875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin-right: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* ─── Empty state for inspector with no selection ──────────────── */
+.inspectorEmpty {
+  padding: 1.5rem 1rem;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+/* ─── Bindable color (literal ⇄ Brand token) ───────────────────── */
+.bindColor {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+.bindColor .colorField {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+.bindColorChip {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 3px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.bindColorChip:hover {
+  border-color: var(--accent);
+}
+.bindColorChipLabel {
+  flex: 1;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bindColorBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.bindColorBtn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ─── Brand-token picker menu ──────────────────────────────────── */
+.brandTokenMenu {
+  z-index: 1001;
+  width: 220px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.brandTokenGroup + .brandTokenGroup {
+  margin-top: 4px;
+}
+.brandTokenGroupTitle {
+  padding: 4px 8px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.brandTokenItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.8125rem;
+  text-align: left;
+  cursor: pointer;
+}
+.brandTokenItem:hover {
+  background: var(--fill-quaternary);
+}
+.brandTokenItemActive {
+  background: var(--fill-quaternary);
+  font-weight: 600;
+}
+.brandTokenItemLabel {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Template gallery modal ───────────────────────────────────── */
+.galleryOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.4);
+}
+.galleryModal {
+  display: flex;
+  flex-direction: column;
+  width: min(880px, 100%);
+  max-height: min(680px, 90vh);
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-lg, 0 12px 48px rgba(0, 0, 0, 0.25));
+  overflow: hidden;
+}
+.galleryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--separator);
+}
+.galleryTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.galleryClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.galleryClose:hover {
+  background: var(--fill-quaternary);
+  color: var(--text);
+}
+.galleryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 20px;
+  overflow-y: auto;
+}
+.galleryCard {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: var(--bg);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+}
+.galleryCard:hover {
+  border-color: var(--accent);
+}
+.galleryPreview {
+  position: relative;
+  height: 200px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--separator);
+}
+.galleryPreviewScale {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform-origin: top center;
+}
+.galleryBlankPreview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-muted);
+  background: var(--fill-quaternary);
+  border-bottom: 1px solid var(--separator);
+}
+.galleryCardMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+}
+.galleryCardName {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.galleryCardDesc {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}

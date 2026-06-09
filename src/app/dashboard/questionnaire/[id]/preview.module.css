@@ -7,10 +7,12 @@
   padding: 0 2rem 2rem;
   transition: background 0.3s;
   position: relative;
+  container-type: inline-size;
 }
 
 .container {
   width: 100%;
+  margin: auto 0;
   transition: max-width 0.3s;
 }
 
@@ -152,7 +154,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
 }
-@media (max-width: 480px) {
+@container (max-width: 480px) {
   .optionsGrid { grid-template-columns: 1fr; }
 }
 
@@ -314,4 +316,23 @@
   max-width: 480px;
   margin: 0 auto;
   line-height: 1.7;
+}
+
+/* ─── Canvas selection (design tab only) ────────────────────────
+ *  Applied to addressable elements when the renderer runs in
+ *  `selectableMode`. Outline (not border) keeps layout stable. */
+.selectable {
+  cursor: pointer;
+  outline: 1px dashed transparent;
+  outline-offset: 2px;
+  transition: outline-color var(--duration-fast) var(--ease-out);
+}
+.selectable:hover {
+  outline-color: var(--accent, #007aff);
+  outline-style: dashed;
+}
+.canvasSelected,
+.canvasSelected:hover {
+  outline: 2px solid var(--accent, #007aff);
+  outline-offset: 2px;
 }

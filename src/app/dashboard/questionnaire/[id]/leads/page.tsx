@@ -1,16 +1,26 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useMemo, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Users } from 'lucide-react';
 import type { Question, LeadField } from '@/lib/types';
+import { LeadsToolbar } from './_LeadsToolbar';
+import {
+  EMPTY_FILTERS,
+  applyLeadFilters,
+  type AudienceRow,
+  type Lead,
+  type LeadFilters,
+  type OptionalFilterKey,
+} from './_filters';
 import styles from './leads.module.css';
 
 type ResponseRow = {
   id: string;
   session_id: string;
   total_score: number | null;
+  audience_id: string | null;
   started_at: string;
   completed_at: string | null;
   metadata: Record<string, unknown> | null;
@@ -26,27 +36,20 @@ type AnswerRow = {
   answer: { value?: string; selected_options?: string[] } | null;
 };
 
-type Lead = {
-  id: string;
-  name: string | null;
-  email: string | null;
-  score: number | null;
-  started_at: string;
-  completed_at: string | null;
-  durationMs: number | null;
-};
-
 export default function LeadsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [audiences, setAudiences] = useState<AudienceRow[]>([]);
+  const [filters, setFilters] = useState<LeadFilters>(EMPTY_FILTERS);
+  const [added, setAdded] = useState<OptionalFilterKey[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       const supabase = createClient();
 
-      const [questionsRes, qRes] = await Promise.all([
+      const [questionsRes, qRes, audiencesRes] = await Promise.all([
         supabase
           .from('questions')
           .select('id, type, title, sort_order')
@@ -57,7 +60,13 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
           .select('lead_fields, template:lead_field_templates(fields)')
           .eq('id', id)
           .maybeSingle(),
+        supabase
+          .from('questionnaire_audiences')
+          .select('id, name, color')
+          .eq('questionnaire_id', id),
       ]);
+      const audienceList = (audiencesRes.data ?? []) as AudienceRow[];
+      const audienceMap = new Map<string, AudienceRow>(audienceList.map((a) => [a.id, a]));
       const questions = (questionsRes.data || []) as Pick<Question, 'id' | 'type' | 'title'>[];
 
       const templateFields = (() => {
@@ -80,7 +89,7 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
 
       const responsesRes = await supabase
         .from('responses')
-        .select('id, session_id, total_score, started_at, completed_at, metadata')
+        .select('id, session_id, total_score, audience_id, started_at, completed_at, metadata')
         .eq('questionnaire_id', id)
         .order('started_at', { ascending: false });
       const responses = (responsesRes.data || []) as ResponseRow[];
@@ -136,6 +145,7 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
           name,
           email,
           score: r.total_score,
+          audience: r.audience_id ? audienceMap.get(r.audience_id) ?? null : null,
           started_at: r.started_at,
           completed_at: r.completed_at,
           durationMs,
@@ -143,10 +153,13 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
       });
 
       setLeads(mapped);
+      setAudiences(audienceList);
       setLoading(false);
     };
     load();
   }, [id]);
+
+  const filtered = useMemo(() => applyLeadFilters(leads, filters), [leads, filters]);
 
   const formatDate = (d: string) =>
     new Date(d).toLocaleString('en-GB', {
@@ -197,38 +210,73 @@ export default function LeadsPage({ params }: { params: Promise<{ id: string }> 
   return (
     <div className={styles.body}>
       <div className={styles.bodyInner}>
-      <div className={styles.table}>
-        <div className={`${styles.row} ${styles.header}`}>
-          <div className={styles.cell}>Name</div>
-          <div className={styles.cell}>Email</div>
-          <div className={styles.cell}>Date</div>
-          <div className={styles.cell}>Duration</div>
-          <div className={`${styles.cell} ${styles.cellRight}`}>Score</div>
+        <LeadsToolbar
+          filters={filters}
+          setFilters={setFilters}
+          added={added}
+          setAdded={setAdded}
+          audiences={audiences}
+          resultCount={filtered.length}
+        />
+        <div className={styles.table}>
+          <div className={`${styles.row} ${styles.header}`}>
+            <div className={styles.cell}>Name</div>
+            <div className={styles.cell}>Email</div>
+            <div className={styles.cell}>Date</div>
+            <div className={styles.cell}>Duration</div>
+            <div className={styles.cell}>Audience</div>
+            <div className={`${styles.cell} ${styles.cellRight}`}>Score</div>
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className={styles.noMatch}>No leads match your filters.</div>
+          ) : (
+            filtered.map((lead) => (
+              <button
+                key={lead.id}
+                className={styles.row}
+                onClick={() => router.push(`/dashboard/questionnaire/${id}/leads/${lead.id}`)}
+              >
+                <div className={styles.cell}>
+                  {lead.name || <span className={styles.dim}>——</span>}
+                </div>
+                <div className={styles.cell}>
+                  {lead.email || <span className={styles.dim}>——</span>}
+                </div>
+                <div className={styles.cell}>{formatDate(lead.started_at)}</div>
+                <div className={styles.cell}>{formatDuration(lead.durationMs)}</div>
+                <div className={styles.cell}>
+                  {lead.audience ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
+                      <span
+                        aria-hidden
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: lead.audience.color ?? 'var(--text-muted)',
+                          display: 'inline-block',
+                        }}
+                      />
+                      {lead.audience.name}
+                    </span>
+                  ) : (
+                    <span className={styles.dim}>——</span>
+                  )}
+                </div>
+                <div className={`${styles.cell} ${styles.cellRight}`}>
+                  {lead.score !== null ? (
+                    <span className="badge badge-accent">{lead.score}</span>
+                  ) : (
+                    <span className={`badge ${lead.completed_at ? 'badge-success' : 'badge-warning'}`}>
+                      {lead.completed_at ? 'Completed' : 'Partial'}
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))
+          )}
         </div>
-        {leads.map((lead) => (
-          <button
-            key={lead.id}
-            className={styles.row}
-            onClick={() => router.push(`/dashboard/questionnaire/${id}/leads/${lead.id}`)}
-          >
-            <div className={styles.cell}>{lead.name || <span className={styles.dim}>——</span>}</div>
-            <div className={styles.cell}>
-              {lead.email || <span className={styles.dim}>——</span>}
-            </div>
-            <div className={styles.cell}>{formatDate(lead.started_at)}</div>
-            <div className={styles.cell}>{formatDuration(lead.durationMs)}</div>
-            <div className={`${styles.cell} ${styles.cellRight}`}>
-              {lead.score !== null ? (
-                <span className="badge badge-accent">{lead.score}</span>
-              ) : (
-                <span className={`badge ${lead.completed_at ? 'badge-success' : 'badge-warning'}`}>
-                  {lead.completed_at ? 'Completed' : 'Partial'}
-                </span>
-              )}
-            </div>
-          </button>
-        ))}
-      </div>
       </div>
     </div>
   );

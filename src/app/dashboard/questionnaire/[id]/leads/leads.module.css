@@ -22,7 +22,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 1.4fr 1.6fr 1fr 0.7fr 0.7fr;
+  grid-template-columns: 1.4fr 1.6fr 1fr 0.7fr 0.9fr 0.7fr;
   align-items: center;
   width: 100%;
   padding: 0.875rem 1rem;
@@ -49,6 +49,246 @@
   color: var(--text-secondary);
 }
 .header:hover { background: var(--surface-secondary, var(--fill-quaternary)); }
+
+/* ─── Filter toolbar ────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.searchBox { position: relative; display: inline-flex; }
+.searchIcon {
+  position: absolute;
+  left: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+.searchInput {
+  width: 200px;
+  max-width: 46vw;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 0.6rem 0.5rem 2rem;
+}
+.searchInput::placeholder { color: var(--text-muted); }
+.searchInput:focus { outline: none; border-color: var(--accent); }
+
+.count {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.addFilterBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-md);
+  padding: 0.4rem 0.5rem;
+  cursor: pointer;
+}
+.addFilterBtn:hover { background: var(--accent-muted); }
+
+.toolbarDivider {
+  width: 1px;
+  height: 22px;
+  background: var(--separator);
+  margin: 0 0.15rem;
+}
+
+/* Added-column filter chips (Date / Duration / Score / Status) */
+.filterChip {
+  display: inline-flex;
+  align-items: center;
+  background: var(--fill-tertiary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.filterChipOn {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+}
+.chipTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0.35rem 0.3rem 0.35rem 0.75rem;
+  max-width: 240px;
+}
+.chipTrigger[data-active] { color: var(--accent); }
+.chipX {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0.35rem 0.55rem 0.35rem 0.2rem;
+}
+.chipX:hover { color: var(--text); }
+
+/* Audience quick-toggle chips */
+.quickChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--fill-tertiary);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.quickChip:hover { background: var(--fill-secondary); }
+.quickChipOn {
+  color: var(--accent);
+  background: var(--accent-muted);
+  border-color: var(--accent);
+}
+.quickChipOn:hover { background: var(--accent-glow); }
+
+.clearAll {
+  margin-left: auto;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0.4rem;
+}
+.clearAll:hover { color: var(--text); text-decoration: underline; }
+
+.triggerLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Filter popover ────────────────────────────────────────── */
+.popoverWrap { position: relative; display: inline-flex; min-width: 0; }
+.popoverPanel {
+  z-index: 20;
+  min-width: 200px;
+  padding: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  cursor: default;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.popoverField { display: flex; flex-direction: column; gap: 0.3rem; }
+.popoverLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.rangeInputs { display: flex; align-items: center; gap: 0.4rem; }
+.rangeInputs input {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.5rem;
+}
+.rangeInputs input:focus { outline: none; border-color: var(--accent); }
+.rangeDash { color: var(--text-muted); }
+
+.segmented {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.segmented button {
+  flex: 1;
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 0.35rem 0.4rem;
+  border: 0;
+  border-right: 1px solid var(--separator);
+  background: var(--surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.segmented button:last-child { border-right: 0; }
+.segmented button:hover { background: var(--fill-quaternary); }
+.segmentedActive,
+.segmented button.segmentedActive { background: var(--accent); color: #fff; }
+
+/* ─── Add-filter menu ───────────────────────────────────────── */
+.addMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 160px;
+}
+.menuItem {
+  text-align: left;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+}
+.menuItem:hover { background: var(--fill-quaternary); }
+.menuEmpty {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  padding: 0.45rem 0.6rem;
+}
+
+.noMatch {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
 
 .cell {
   font-size: 0.8125rem;

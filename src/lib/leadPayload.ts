@@ -1,12 +1,14 @@
 import type {
+  Audience,
   LeadField,
   Question,
   QuestionOption,
   ScoringRule,
-  ScoreResult,
+  ResultPage,
   Questionnaire,
 } from '@/lib/types';
 import { resolveLeadFields } from '@/lib/leadFields';
+import { deriveTitleDescription } from '@/lib/resultPage';
 
 /* ─── Public payload shape ────────────────────────────────────── */
 /*
@@ -55,6 +57,9 @@ export interface LeadPayload {
     duration_ms: number | null;
     total_score: number | null;
     result: { id: string; title: string; description: string | null } | null;
+    /** Assigned audience for this lead. Null when no audience rule matched
+     *  or the questionnaire has no audiences configured. */
+    audience: { id: string; name: string; color: string | null } | null;
     source: {
       host: string | null;
       user_agent: string | null;
@@ -80,7 +85,9 @@ interface BuildArgs {
   startedAt: string | null;
   completedAt: string | null;
   totalScore: number | null;
-  matchedResult: ScoreResult | null;
+  matchedResult: ResultPage | null;
+  /** Audience this lead landed in, or null. */
+  matchedAudience?: Audience | null;
   host: string | null;
   userAgent: string | null;
   questionnaire: Pick<Questionnaire, 'id' | 'title' | 'slug' | 'project_id' | 'lead_fields'>;
@@ -106,6 +113,7 @@ export function buildLeadPayload(args: BuildArgs): LeadPayload {
     completedAt,
     totalScore,
     matchedResult,
+    matchedAudience,
     host,
     userAgent,
     questionnaire,
@@ -185,11 +193,19 @@ export function buildLeadPayload(args: BuildArgs): LeadPayload {
       duration_ms: durationMs,
       total_score: totalScore,
       result: matchedResult
-        ? {
-            id: matchedResult.id,
-            title: matchedResult.title,
-            description: matchedResult.description ?? null,
-          }
+        ? (() => {
+            // Derive the human-readable title/description from the page's
+            // content blocks for backward-compatible webhook payloads.
+            const { title, description } = deriveTitleDescription(matchedResult);
+            return {
+              id: matchedResult.id,
+              title,
+              description: description || null,
+            };
+          })()
+        : null,
+      audience: matchedAudience
+        ? { id: matchedAudience.id, name: matchedAudience.name, color: matchedAudience.color }
         : null,
       source: { host, user_agent: userAgent },
     },
