@@ -1,3 +1,18 @@
+## 2026-06-10 14:43
+
+- chore(config): allow land command in agent permissions
+- feat: add undo/redo to the questionnaire editor
+- feat(design): switch letter-spacing to pixels
+- feat(design): show the padding controls in pixels
+- feat(logic): add draggable port to redirect a question's default path
+- feat(logic): center flow tree evenly + drag cards to reorder branches
+- feat(design): make the selected-answer fill + border designable
+- feat(design): default the progress fill to the brand accent color
+- fix(design): collapse the two back-button toggles into one
+- feat(result): delete the selected block with the delete key
+- feat(result): add a full-screen result-page preview
+- feat(result): show + edit the real page background in the designer
+
 # Changelog
 
 Staging deploys are documented here. New entries are prepended automatically
