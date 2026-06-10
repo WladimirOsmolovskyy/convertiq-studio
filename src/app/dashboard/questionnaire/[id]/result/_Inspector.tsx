@@ -64,6 +64,9 @@ import type {
   TextSpan,
 } from '@/lib/types';
 import { BRAND_GROUPS, isColorRef, resolveBrandToken } from '@/lib/types';
+import type { DesignConfig } from '@/lib/types';
+import { resolveDesign } from '@/lib/designResolve';
+import ColorPicker from '@/components/ColorPicker';
 import { canMoveNode, findNode } from '@/lib/resultPage';
 import { listAvailableVariables, type AvailableVariable } from '@/lib/resultVariables';
 import { useQuestionnaireStore } from '@/store/useQuestionnaireStore';
@@ -81,6 +84,8 @@ export default function Inspector({ page, selectedNodeId }: Props) {
     questionnaire,
     questions,
     brand,
+    design,
+    updateDesign,
     updateResultPage,
     updateResultPageNode,
     removeResultPageNode,
@@ -99,6 +104,7 @@ export default function Inspector({ page, selectedNodeId }: Props) {
     return (
       <aside className={styles.inspector}>
         <PagePropsSection page={page} updateResultPage={updateResultPage} />
+        <BackgroundSection design={design} brand={brand} updateDesign={updateDesign} />
       </aside>
     );
   }
@@ -221,6 +227,134 @@ function PagePropsSection({
         </div>
       </PropRow>
       <p className={styles.dimHint}>Select a block in the canvas to edit its properties.</p>
+    </Section>
+  );
+}
+
+/* ─── Page background (no selection) ────────────────────────────── */
+
+/** Edits the questionnaire-wide page background (solid / gradient / image) —
+ *  the real surface the page renders on, shown live on the canvas. Solid uses
+ *  the resolved Background color, edited through the shared ColorPicker. */
+function BackgroundSection({
+  design,
+  brand,
+  updateDesign,
+}: {
+  design: DesignConfig;
+  brand: BrandPalette;
+  updateDesign: (partial: Partial<DesignConfig>) => void;
+}) {
+  const [pickerRect, setPickerRect] = useState<DOMRect | null>(null);
+  const resolved = resolveDesign(design, brand);
+  const type = design.background.type;
+  const bgColor = resolved.colors.background;
+
+  return (
+    <Section title="Background">
+      <PropRow label="Type">
+        <div className={styles.segCtl}>
+          {(['solid', 'gradient', 'image'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={`${styles.segCtlBtn} ${type === t ? styles.segCtlBtnActive : ''}`}
+              onClick={() =>
+                updateDesign({
+                  background: {
+                    type: t,
+                    value:
+                      t === 'gradient'
+                        ? `linear-gradient(135deg, ${bgColor}, ${resolved.colors.primary})`
+                        : t === 'image'
+                          ? design.background.type === 'image'
+                            ? design.background.value
+                            : ''
+                          : bgColor,
+                  },
+                })
+              }
+            >
+              {t[0].toUpperCase() + t.slice(1)}
+            </button>
+          ))}
+        </div>
+      </PropRow>
+
+      {type === 'solid' && (
+        <PropRow label="Color">
+          <button
+            type="button"
+            className={styles.colorField}
+            style={{ cursor: 'pointer', width: '100%' }}
+            onClick={(e) => setPickerRect(e.currentTarget.getBoundingClientRect())}
+          >
+            <span className={styles.colorSwatch} style={{ background: bgColor }} />
+            <span className={styles.colorFieldInput} style={{ textAlign: 'left' }}>
+              {bgColor}
+            </span>
+          </button>
+        </PropRow>
+      )}
+
+      {type === 'gradient' && (
+        <PropRow label="CSS">
+          <input
+            className={styles.fwInput}
+            value={design.background.value}
+            onChange={(e) =>
+              updateDesign({ background: { ...design.background, value: e.target.value } })
+            }
+            placeholder="linear-gradient(…)"
+          />
+        </PropRow>
+      )}
+
+      {type === 'image' && (
+        <>
+          <PropRow label="URL">
+            <input
+              className={styles.fwInput}
+              value={design.background.value}
+              onChange={(e) =>
+                updateDesign({ background: { ...design.background, value: e.target.value } })
+              }
+              placeholder="https://…"
+            />
+          </PropRow>
+          <label
+            className="btn btn-secondary btn-sm"
+            style={{ cursor: 'pointer', display: 'inline-flex', justifyContent: 'center' }}
+          >
+            Upload image
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                const reader = new FileReader();
+                reader.onload = () =>
+                  updateDesign({ background: { type: 'image', value: reader.result as string } });
+                reader.readAsDataURL(f);
+              }}
+            />
+          </label>
+        </>
+      )}
+
+      <p className={styles.dimHint}>Applies to the whole questionnaire background.</p>
+
+      {pickerRect && (
+        <ColorPicker
+          title="Background"
+          value={bgColor}
+          anchor={pickerRect}
+          onChange={(v) => updateDesign({ colors: { background: v } })}
+          onClose={() => setPickerRect(null)}
+        />
+      )}
     </Section>
   );
 }
