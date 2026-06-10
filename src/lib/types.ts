@@ -62,6 +62,11 @@ export interface QuestionBranch {
   /** Per-question evaluation order (first match wins). Branches are sorted by
    *  this before evaluation; absent → falls back to insertion order. */
   sort_order?: number;
+  /** The question's fall-through path (no condition). At most one per question.
+   *  Evaluated last — only when no conditional branch navigates — and replaces
+   *  the implicit next-by-order. `condition` is inert; only target_question_id /
+   *  is_end matter. Absent/false → ordinary conditional branch. */
+  is_default?: boolean;
   /** When this branch matches, tag the visitor with this audience (mid-flow).
    *  Sticky, last-write-wins across the run; overrides score-range/red-flag
    *  assignment at submit. Null → this branch assigns no audience. Orthogonal

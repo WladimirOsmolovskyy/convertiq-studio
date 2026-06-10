@@ -89,6 +89,10 @@ interface QuestionnaireState {
     optionId: string | null,
     target: { questionId: string } | { isEnd: true },
   ) => void;
+  /** Set a question's default (no-condition) path by graph drag. Find-or-creates
+   *  the single `is_default` branch for the question and re-targets it, so the
+   *  fall-through goes to `target` instead of the next question by order. */
+  setDefaultBranch: (sourceQuestionId: string, target: { questionId: string } | { isEnd: true }) => void;
   updateScoringRule: (questionId: string, updates: Partial<ScoringRule>) => void;
   addResultPage: () => void;
   /** Append a result page seeded from a global template (id from
@@ -428,9 +432,41 @@ export const useQuestionnaireStore = create<QuestionnaireState>((rawSet, get) =>
     });
   },
 
+  setDefaultBranch: (sourceQuestionId, target) => {
+    const targetPatch =
+      'isEnd' in target
+        ? { target_question_id: null, is_end: true }
+        : { target_question_id: target.questionId, is_end: false };
+
+    const branches = get().branches;
+    const existing = branches.find((b) => b.question_id === sourceQuestionId && b.is_default);
+    if (existing) {
+      set({
+        branches: branches.map((b) => (b.id === existing.id ? { ...b, ...targetPatch } : b)),
+        isDirty: true,
+      });
+      return;
+    }
+    set({
+      branches: [
+        ...branches,
+        {
+          id: crypto.randomUUID(),
+          question_id: sourceQuestionId,
+          condition: { field: 'value', operator: 'equals', value: '' },
+          sort_order: 0,
+          assign_audience_id: null,
+          is_default: true,
+          ...targetPatch,
+        },
+      ],
+      isDirty: true,
+    });
+  },
+
   reorderBranches: (questionId, from, to) => {
     const qBranches = get()
-      .branches.filter((b) => b.question_id === questionId)
+      .branches.filter((b) => b.question_id === questionId && !b.is_default)
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     const [moved] = qBranches.splice(from, 1);
     qBranches.splice(to, 0, moved);
@@ -852,6 +888,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((rawSet, get) =>
             is_end: b.is_end,
             sort_order: b.sort_order ?? 0,
             assign_audience_id: b.assign_audience_id ?? null,
+            is_default: b.is_default ?? false,
           })),
         );
         if (bInsErr) console.error('Insert branches failed:', bInsErr);
