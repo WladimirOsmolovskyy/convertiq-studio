@@ -209,8 +209,8 @@ export default function QuestionnaireRenderer({
   // Identity for fully-populated configs (existing questionnaires); fills
   // gaps from brand (new questionnaires). All style reads below use `d`.
   const d = resolveDesign(design, brand);
-  // Back button shows only when both toggles allow it (default true).
-  const showBackBtn = (d.behavior?.showBackButton ?? true) && (d.behavior?.allowBack ?? true);
+  // Single toggle: show the Back button (and allow going back) — default true.
+  const showBackBtn = d.behavior?.showBackButton ?? true;
 
   const getBackgroundCSS = () => {
     if (d.background.type === 'gradient') return d.background.value;
@@ -492,7 +492,7 @@ export default function QuestionnaireRenderer({
         fontSize: `${d.typography.body?.size ?? d.typography.baseFontSize}px`,
         fontWeight: d.typography.body?.weight ?? 400,
         lineHeight: d.typography.body?.lineHeight ?? d.typography.lineHeight,
-        letterSpacing: `${d.typography.body?.letterSpacing ?? 0}em`,
+        letterSpacing: `${d.typography.body?.letterSpacing ?? 0}px`,
         ...elementOverrideStyle(d, 'page'),
       }}
     >
@@ -584,7 +584,7 @@ export default function QuestionnaireRenderer({
                     fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
                     fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
                     lineHeight: d.typography.heading?.lineHeight ?? 1.2,
-                    letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
+                    letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.5}px`,
                     color: d.colors.heading,
                     ...elementOverrideStyle(d, 'questionTitle'),
                   }}
@@ -691,7 +691,7 @@ export default function QuestionnaireRenderer({
                     fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
                     fontSize: `${d.typography.heading?.size ?? Math.round(d.typography.baseFontSize * 1.375)}px`,
                     lineHeight: d.typography.heading?.lineHeight ?? 1.2,
-                    letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
+                    letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.5}px`,
                     color: d.colors.heading,
                     ...elementOverrideStyle(d, 'questionTitle'),
                   }}
@@ -731,6 +731,10 @@ export default function QuestionnaireRenderer({
                       const optSel = interact(optElementId, () =>
                         isRadio ? handleRadioSelect(opt.id) : handleOptionSelect(opt.id),
                       );
+                      // Active-state overrides (inspector): applied only when selected.
+                      const ov = d.elements?.[optElementId];
+                      const selFill = isSelected && typeof ov?.selectedFill === 'string' ? ov?.selectedFill : undefined;
+                      const selBorder = isSelected && typeof ov?.selectedBorder === 'string' ? ov?.selectedBorder : undefined;
                       return (
                         <button
                           key={opt.id}
@@ -747,6 +751,8 @@ export default function QuestionnaireRenderer({
                             borderRadius: `${d.layout.borderRadius * 0.6}px`,
                             color: d.colors.text,
                             ...elementOverrideStyle(d, optElementId),
+                            ...(selFill ? { background: selFill } : {}),
+                            ...(selBorder ? { border: `1px solid ${selBorder}` } : {}),
                           }}
                         >
                           {!isRadio && (
@@ -955,7 +961,7 @@ export default function QuestionnaireRenderer({
                       style={{
                         fontFamily: d.typography.headingFont,
                         fontWeight: d.typography.heading?.weight ?? d.typography.headingWeight,
-                        letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.02}em`,
+                        letterSpacing: `${d.typography.heading?.letterSpacing ?? -0.5}px`,
                         color: d.colors.heading,
                       }}
                     >

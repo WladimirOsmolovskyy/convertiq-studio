@@ -171,7 +171,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
   updateDesign: (partial) => {
     const c = get().design;
     const bodyDefaults = { size: 16, weight: 400, lineHeight: 1.6, letterSpacing: 0, color: '#1d1d1f' };
-    const headingDefaults = { size: 22, weight: 700, lineHeight: 1.2, letterSpacing: -0.02, color: '#1d1d1f' };
+    const headingDefaults = { size: 22, weight: 700, lineHeight: 1.2, letterSpacing: -0.5, color: '#1d1d1f' };
     set({
       design: {
         ...c,

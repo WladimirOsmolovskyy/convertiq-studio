@@ -320,14 +320,14 @@ export interface DesignConfig {
       size: number; // px
       weight: number;
       lineHeight: number;
-      letterSpacing: number; // em
+      letterSpacing: number; // px
       color: string;
     };
     heading: {
       size: number; // px
       weight: number;
       lineHeight: number;
-      letterSpacing: number; // em
+      letterSpacing: number; // px
       color: string;
     };
   };
@@ -397,11 +397,9 @@ export interface DesignConfig {
     /** 1-based question number from which the progress bar becomes visible
      *  (default 1 = always shown). */
     progressStartQuestion?: number;
-    /** Whether to show the Back button (default true). */
+    /** Whether to show the Back button / let the respondent go back
+     *  (default true). */
     showBackButton?: boolean;
-    /** Whether the respondent may navigate backward (default true). When
-     *  false, the Back button is hidden regardless of `showBackButton`. */
-    allowBack?: boolean;
     /** Progress label format: 'percent' → "42%", 'fraction' → "Question 3
      *  of 8" (default 'percent'). */
     progressDisplayMode?: 'percent' | 'fraction';
@@ -457,6 +455,10 @@ export interface ElementStyles {
   radius?: Styled<number>;
   border?: Styled<string>;
   shadows?: Styled<string>;
+  // Selected/active-state overrides for answer options — fill + border color,
+  // applied only when the option is selected.
+  selectedFill?: Styled<string>;
+  selectedBorder?: Styled<string>;
   // Layout section
   layoutType?: 'stack' | 'grid';
   direction?: 'horizontal' | 'vertical';
@@ -496,7 +498,7 @@ export const defaultDesign: DesignConfig = {
       size: 22,
       weight: 700,
       lineHeight: 1.2,
-      letterSpacing: -0.02,
+      letterSpacing: -0.5,
       color: '#1d1d1f',
     },
   },
