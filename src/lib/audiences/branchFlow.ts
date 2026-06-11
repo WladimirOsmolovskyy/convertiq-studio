@@ -88,17 +88,30 @@ export function nextStep(
 ): BranchStep {
   const q = questions[qIndex];
   const ans = answers[q.id];
-  const qBranches = branches
-    .filter((b) => b.question_id === q.id)
+  const qBranches = branches.filter((b) => b.question_id === q.id);
+  const conditional = qBranches
+    .filter((b) => !b.is_default)
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const defaultBranch = qBranches.find((b) => b.is_default);
 
   let assignedAudienceId: string | null = null;
-  for (const branch of qBranches) {
+  for (const branch of conditional) {
     if (!branchMatches(branch.condition, ans)) continue;
     if (branch.assign_audience_id) assignedAudienceId = branch.assign_audience_id;
     if (branch.is_end) return { nextIdx: -1, assignedAudienceId };
     if (branch.target_question_id) {
       const targetIdx = questions.findIndex((tq) => tq.id === branch.target_question_id);
+      if (targetIdx >= 0) return { nextIdx: targetIdx, assignedAudienceId };
+    }
+  }
+
+  // No conditional branch navigated → take the explicit default path if set,
+  // otherwise fall through to the next question by order.
+  if (defaultBranch) {
+    if (defaultBranch.assign_audience_id) assignedAudienceId = defaultBranch.assign_audience_id;
+    if (defaultBranch.is_end) return { nextIdx: -1, assignedAudienceId };
+    if (defaultBranch.target_question_id) {
+      const targetIdx = questions.findIndex((tq) => tq.id === defaultBranch.target_question_id);
       if (targetIdx >= 0) return { nextIdx: targetIdx, assignedAudienceId };
     }
   }

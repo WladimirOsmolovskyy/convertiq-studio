@@ -1514,3 +1514,39 @@
   line-height: 1.4;
   color: var(--text-muted);
 }
+
+/* ─── Full-screen result preview ───────────────────────────────── */
+.previewOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  overflow: auto;
+}
+.previewScroll {
+  min-height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 3rem 1.5rem;
+  box-sizing: border-box;
+}
+.previewClose {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 2001;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--surface);
+  border: 1px solid var(--separator);
+  border-radius: 50%;
+  box-shadow: var(--shadow-md);
+  color: var(--text);
+  cursor: pointer;
+}
+.previewClose:hover {
+  background: var(--fill-quaternary);
+}

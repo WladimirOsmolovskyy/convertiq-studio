@@ -53,6 +53,8 @@ interface QuestionnaireState {
   isDirty: boolean;
   isSaving: boolean;
   saveStatus: SaveStatus;
+  past: Snapshot[];
+  future: Snapshot[];
 
   setQuestionnaire: (q: Questionnaire) => void;
   setQuestions: (q: Question[]) => void;
@@ -87,6 +89,10 @@ interface QuestionnaireState {
     optionId: string | null,
     target: { questionId: string } | { isEnd: true },
   ) => void;
+  /** Set a question's default (no-condition) path by graph drag. Find-or-creates
+   *  the single `is_default` branch for the question and re-targets it, so the
+   *  fall-through goes to `target` instead of the next question by order. */
+  setDefaultBranch: (sourceQuestionId: string, target: { questionId: string } | { isEnd: true }) => void;
   updateScoringRule: (questionId: string, updates: Partial<ScoringRule>) => void;
   addResultPage: () => void;
   /** Append a result page seeded from a global template (id from
@@ -145,10 +151,74 @@ interface QuestionnaireState {
     brand?: BrandPalette;
   }) => void;
   reset: () => void;
+  undo: () => void;
+  redo: () => void;
   saveAll: () => Promise<void>;
 }
 
-export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
+const HISTORY_LIMIT = 100;
+const COALESCE_MS = 500;
+
+// Document slices captured for undo/redo. `brand` is read-only and save/dirty
+// flags are transient, so neither is tracked.
+type Snapshot = Pick<
+  QuestionnaireState,
+  'questionnaire' | 'questions' | 'branches' | 'scoringRules' | 'resultPages' | 'design' | 'audiences'
+>;
+type StoreSet = (
+  partial: Partial<QuestionnaireState> | ((state: QuestionnaireState) => Partial<QuestionnaireState>),
+  replace?: boolean,
+) => void;
+const TRACKED_KEYS = [
+  'questionnaire',
+  'questions',
+  'branches',
+  'scoringRules',
+  'resultPages',
+  'design',
+  'audiences',
+] as const;
+function snapshotOf(s: QuestionnaireState): Snapshot {
+  return {
+    questionnaire: s.questionnaire,
+    questions: s.questions,
+    branches: s.branches,
+    scoringRules: s.scoringRules,
+    resultPages: s.resultPages,
+    design: s.design,
+    audiences: s.audiences,
+  };
+}
+
+export const useQuestionnaireStore = create<QuestionnaireState>((rawSet, get) => {
+  const setState = rawSet as unknown as StoreSet;
+  let lastEditAt = 0;
+
+  // Wrap `set` so any mutation touching a tracked document slice records an
+  // undo snapshot. Actions that drive history themselves (undo/redo/hydrate/
+  // reset) set `past`/`future` directly and are detected + skipped here.
+  // Rapid edits within COALESCE_MS (e.g. typing) collapse into one entry.
+  const set: StoreSet = (partial, replace) => {
+    const before = get();
+    setState(partial, replace);
+    const after = get();
+
+    if (after.past !== before.past || after.future !== before.future) {
+      lastEditAt = 0;
+      return;
+    }
+    if (!TRACKED_KEYS.some((k) => before[k] !== after[k])) return;
+
+    const now = Date.now();
+    if (now - lastEditAt < COALESCE_MS && before.past.length > 0) {
+      if (after.future.length > 0) setState({ future: [] });
+    } else {
+      setState({ past: [...before.past, snapshotOf(before)].slice(-HISTORY_LIMIT), future: [] });
+    }
+    lastEditAt = now;
+  };
+
+  return {
   questionnaire: null,
   questions: [],
   branches: [],
@@ -160,6 +230,8 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
   isDirty: false,
   isSaving: false,
   saveStatus: 'idle' as SaveStatus,
+  past: [],
+  future: [],
 
   setQuestionnaire: (q) => set({ questionnaire: q }),
   setQuestions: (q) => set({ questions: q, isDirty: true }),
@@ -171,7 +243,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
   updateDesign: (partial) => {
     const c = get().design;
     const bodyDefaults = { size: 16, weight: 400, lineHeight: 1.6, letterSpacing: 0, color: '#1d1d1f' };
-    const headingDefaults = { size: 22, weight: 700, lineHeight: 1.2, letterSpacing: -0.02, color: '#1d1d1f' };
+    const headingDefaults = { size: 22, weight: 700, lineHeight: 1.2, letterSpacing: -0.5, color: '#1d1d1f' };
     set({
       design: {
         ...c,
@@ -360,9 +432,41 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
     });
   },
 
+  setDefaultBranch: (sourceQuestionId, target) => {
+    const targetPatch =
+      'isEnd' in target
+        ? { target_question_id: null, is_end: true }
+        : { target_question_id: target.questionId, is_end: false };
+
+    const branches = get().branches;
+    const existing = branches.find((b) => b.question_id === sourceQuestionId && b.is_default);
+    if (existing) {
+      set({
+        branches: branches.map((b) => (b.id === existing.id ? { ...b, ...targetPatch } : b)),
+        isDirty: true,
+      });
+      return;
+    }
+    set({
+      branches: [
+        ...branches,
+        {
+          id: crypto.randomUUID(),
+          question_id: sourceQuestionId,
+          condition: { field: 'value', operator: 'equals', value: '' },
+          sort_order: 0,
+          assign_audience_id: null,
+          is_default: true,
+          ...targetPatch,
+        },
+      ],
+      isDirty: true,
+    });
+  },
+
   reorderBranches: (questionId, from, to) => {
     const qBranches = get()
-      .branches.filter((b) => b.question_id === questionId)
+      .branches.filter((b) => b.question_id === questionId && !b.is_default)
       .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
     const [moved] = qBranches.splice(from, 1);
     qBranches.splice(to, 0, moved);
@@ -664,10 +768,34 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
     });
   },
 
-  hydrate: (data) => set({ ...data, brand: data.brand ?? {}, isDirty: false, isSaving: false, saveStatus: 'idle' }),
+  hydrate: (data) => set({ ...data, brand: data.brand ?? {}, isDirty: false, isSaving: false, saveStatus: 'idle', past: [], future: [] }),
 
   reset: () =>
-    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], resultPages: [], design: defaultDesign, brand: {}, audiences: [], isDirty: false, isSaving: false, saveStatus: 'idle' }),
+    set({ questionnaire: null, questions: [], branches: [], scoringRules: [], resultPages: [], design: defaultDesign, brand: {}, audiences: [], isDirty: false, isSaving: false, saveStatus: 'idle', past: [], future: [] }),
+
+  undo: () =>
+    set((s) => {
+      if (s.past.length === 0) return s;
+      const prev = s.past[s.past.length - 1];
+      return {
+        ...prev,
+        past: s.past.slice(0, -1),
+        future: [snapshotOf(s), ...s.future].slice(0, HISTORY_LIMIT),
+        isDirty: true,
+      };
+    }),
+
+  redo: () =>
+    set((s) => {
+      if (s.future.length === 0) return s;
+      const next = s.future[0];
+      return {
+        ...next,
+        past: [...s.past, snapshotOf(s)].slice(-HISTORY_LIMIT),
+        future: s.future.slice(1),
+        isDirty: true,
+      };
+    }),
 
   saveAll: async () => {
     // Read fresh state on each call so we always persist the latest store.
@@ -760,6 +888,7 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
             is_end: b.is_end,
             sort_order: b.sort_order ?? 0,
             assign_audience_id: b.assign_audience_id ?? null,
+            is_default: b.is_default ?? false,
           })),
         );
         if (bInsErr) console.error('Insert branches failed:', bInsErr);
@@ -889,4 +1018,5 @@ export const useQuestionnaireStore = create<QuestionnaireState>((set, get) => ({
       set({ isSaving: false, saveStatus: 'error' });
     }
   },
-}));
+  };
+});

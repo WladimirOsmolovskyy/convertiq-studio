@@ -136,6 +136,26 @@ export default function EditorLayout({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
+  /* ─── Undo / redo: Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z or Cmd/Ctrl+Y ─ */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Let inputs keep native undo while focused.
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        useQuestionnaireStore.getState().undo();
+      } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        useQuestionnaireStore.getState().redo();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   /* ─── Render ───────────────────────────────────────────────── */
   if (!loaded) {
     return (

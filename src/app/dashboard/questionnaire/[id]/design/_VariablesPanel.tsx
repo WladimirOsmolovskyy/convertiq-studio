@@ -71,7 +71,7 @@ function getHeading(design: { typography: { heading?: { size?: number; weight?: 
     size: design.typography.heading?.size ?? Math.round((design.typography.baseFontSize ?? 16) * 1.375),
     weight: design.typography.heading?.weight ?? design.typography.headingWeight ?? 700,
     lineHeight: design.typography.heading?.lineHeight ?? 1.2,
-    letterSpacing: design.typography.heading?.letterSpacing ?? -0.02,
+    letterSpacing: design.typography.heading?.letterSpacing ?? -0.5,
   };
 }
 
@@ -261,7 +261,7 @@ function FontPanel({
 
       <SliderField label="Size" value={size} onChange={onSizeChange} min={sizeMin} max={sizeMax} unit="px" />
       <SliderField label="Line Height" value={lineHeight} onChange={onLineHeightChange} min={0.8} max={3} step={0.05} />
-      <SliderField label="Spacing" value={letterSpacing} onChange={onLetterSpacingChange} min={-0.1} max={0.3} step={0.005} unit="em" />
+      <SliderField label="Spacing" value={letterSpacing} onChange={onLetterSpacingChange} min={-2} max={10} step={0.5} unit="px" />
     </div>
   );
 }
@@ -366,7 +366,7 @@ export default function VariablesPanel() {
         <SectionTitle>Layout</SectionTitle>
         <SliderField label="Content Width" value={design.layout.maxWidth} onChange={(v) => updateDesign({ layout: { ...design.layout, maxWidth: v } })} min={400} max={1200} step={20} unit="px" />
         <SliderField label="Corner Radius" value={design.layout.borderRadius} onChange={(v) => updateDesign({ layout: { ...design.layout, borderRadius: v } })} min={0} max={30} unit="px" />
-        <SliderField label="Card Padding" value={design.layout.padding} onChange={(v) => updateDesign({ layout: { ...design.layout, padding: v } })} min={0.5} max={4} step={0.25} unit="rem" />
+        <SliderField label="Card Padding" value={Math.round(design.layout.padding * 16)} onChange={(v) => updateDesign({ layout: { ...design.layout, padding: v / 16 } })} min={8} max={64} step={2} unit="px" />
         <SliderField label="Question Gap" value={Math.round(design.layout.questionSpacing * 16)} onChange={(v) => updateDesign({ layout: { ...design.layout, questionSpacing: v / 16 } })} min={8} max={64} step={2} unit="px" />
         <SliderField label="Option Gap" value={design.layout.optionGap ?? 8} onChange={(v) => updateDesign({ layout: { ...design.layout, optionGap: v } })} min={0} max={40} step={2} unit="px" />
       </div>
@@ -377,7 +377,6 @@ export default function VariablesPanel() {
         <SliderField label="Auto-advance delay" value={design.behavior?.selectFeedbackMs ?? SELECT_FEEDBACK_MS} onChange={(v) => updateDesign({ behavior: { ...design.behavior, selectFeedbackMs: v } })} min={0} max={800} step={20} unit="ms" />
         <SliderField label="Show progress from Q" value={design.behavior?.progressStartQuestion ?? 1} onChange={(v) => updateDesign({ behavior: { ...design.behavior, progressStartQuestion: v } })} min={1} max={Math.max(1, questions.length)} step={1} />
         <ToggleField label="Show back button" checked={design.behavior?.showBackButton ?? true} onChange={(v) => updateDesign({ behavior: { ...design.behavior, showBackButton: v } })} />
-        <ToggleField label="Allow going back" checked={design.behavior?.allowBack ?? true} onChange={(v) => updateDesign({ behavior: { ...design.behavior, allowBack: v } })} />
         <div className={editorStyles.sliderRow}>
           <span className={editorStyles.sliderLabel}>Progress label</span>
           <div style={{ display: 'flex', gap: '0.375rem' }}>

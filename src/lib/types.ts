@@ -62,6 +62,11 @@ export interface QuestionBranch {
   /** Per-question evaluation order (first match wins). Branches are sorted by
    *  this before evaluation; absent → falls back to insertion order. */
   sort_order?: number;
+  /** The question's fall-through path (no condition). At most one per question.
+   *  Evaluated last — only when no conditional branch navigates — and replaces
+   *  the implicit next-by-order. `condition` is inert; only target_question_id /
+   *  is_end matter. Absent/false → ordinary conditional branch. */
+  is_default?: boolean;
   /** When this branch matches, tag the visitor with this audience (mid-flow).
    *  Sticky, last-write-wins across the run; overrides score-range/red-flag
    *  assignment at submit. Null → this branch assigns no audience. Orthogonal
@@ -320,14 +325,14 @@ export interface DesignConfig {
       size: number; // px
       weight: number;
       lineHeight: number;
-      letterSpacing: number; // em
+      letterSpacing: number; // px
       color: string;
     };
     heading: {
       size: number; // px
       weight: number;
       lineHeight: number;
-      letterSpacing: number; // em
+      letterSpacing: number; // px
       color: string;
     };
   };
@@ -397,11 +402,9 @@ export interface DesignConfig {
     /** 1-based question number from which the progress bar becomes visible
      *  (default 1 = always shown). */
     progressStartQuestion?: number;
-    /** Whether to show the Back button (default true). */
+    /** Whether to show the Back button / let the respondent go back
+     *  (default true). */
     showBackButton?: boolean;
-    /** Whether the respondent may navigate backward (default true). When
-     *  false, the Back button is hidden regardless of `showBackButton`. */
-    allowBack?: boolean;
     /** Progress label format: 'percent' → "42%", 'fraction' → "Question 3
      *  of 8" (default 'percent'). */
     progressDisplayMode?: 'percent' | 'fraction';
@@ -457,6 +460,10 @@ export interface ElementStyles {
   radius?: Styled<number>;
   border?: Styled<string>;
   shadows?: Styled<string>;
+  // Selected/active-state overrides for answer options — fill + border color,
+  // applied only when the option is selected.
+  selectedFill?: Styled<string>;
+  selectedBorder?: Styled<string>;
   // Layout section
   layoutType?: 'stack' | 'grid';
   direction?: 'horizontal' | 'vertical';
@@ -496,7 +503,7 @@ export const defaultDesign: DesignConfig = {
       size: 22,
       weight: 700,
       lineHeight: 1.2,
-      letterSpacing: -0.02,
+      letterSpacing: -0.5,
       color: '#1d1d1f',
     },
   },
